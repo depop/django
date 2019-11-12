@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 * No Changes yet!
 
+## [1.5.12-depop1]
+### Added
+* Security and translation patches from 1.4.22-depop4
+
 ## [1.4.22-depop4]
 ### Added
 * Update version tracking and add 'post' to version (1.4.22.post4)
