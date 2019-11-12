@@ -11,7 +11,7 @@ def get_version(version=None):
         from django import VERSION as version
     else:
         assert len(version) == 5
-        assert version[3] in ('alpha', 'beta', 'rc', 'final')
+        assert version[3] in ('alpha', 'beta', 'rc', 'final', 'depop')
 
     # Now build the two parts of the version number:
     # main = X.Y[.Z]
@@ -28,7 +28,7 @@ def get_version(version=None):
             sub = '.dev%s' % git_changeset
 
     elif version[3] != 'final':
-        mapping = {'alpha': 'a', 'beta': 'b', 'rc': 'c'}
+        mapping = {'alpha': 'a', 'beta': 'b', 'rc': 'c', 'depop': '.post'}
         sub = mapping[version[3]] + str(version[4])
 
     return str(main + sub)
