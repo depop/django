@@ -1,13 +1,15 @@
 """Translation helper functions."""
 from __future__ import unicode_literals
 
-import locale
 import os
 import re
 import sys
 import gettext as gettext_module
 from threading import local
+from collections import OrderedDict
 
+from django.conf import settings
+from django.conf.locale import LANG_INFO
 from django.utils.importlib import import_module
 from django.utils.encoding import force_str, force_text
 from django.utils._os import upath
@@ -35,9 +37,15 @@ CONTEXT_SEPARATOR = "\x04"
 # and RFC 3066, section 2.1
 accept_language_re = re.compile(r'''
         ([A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*|\*)      # "en", "en-au", "x-y-z", "es-419", "*"
-        (?:\s*;\s*q=(0(?:\.\d{,3})?|1(?:.0{,3})?))?   # Optional "q=1.00", "q=0.8"
+        (?:\s*;\s*q=(0(?:\.\d{,3})?|1(?:\.0{,3})?))?   # Optional "q=1.00", "q=0.8"
         (?:\s*,\s*|$)                                 # Multiple accepts per header.
         ''', re.VERBOSE)
+
+# From 1.11
+language_code_re = re.compile(
+    r'^[a-z]{1,8}(?:-[a-z0-9]{1,8})*(?:@[a-z0-9]{1,20})?$',
+    re.IGNORECASE
+)
 
 language_code_prefix_re = re.compile(r'^/([\w-]+)(/|$)')
 
@@ -353,22 +361,68 @@ def check_for_language(lang_code):
             return True
     return False
 
-def get_language_from_path(path, supported=None):
+def get_languages():
     """
-    Returns the language-code if there is a valid language-code
+    From 1.11
+    Cache of settings.LANGUAGES in an OrderedDict for easy lookups by key.
+    """
+    return OrderedDict(settings.LANGUAGES)
+
+def get_supported_language_variant(lang_code, strict=False):
+    """
+    From 1.11
+    Return the language-code that's listed in supported languages, possibly
+    selecting a more generic variant. Raise LookupError if nothing is found.
+
+    If `strict` is False (the default), look for an alternative
+    country-specific variant when the currently checked is not found.
+
+    lru_cache should have a maxsize to prevent from memory exhaustion attacks,
+    as the provided language codes are taken from the HTTP request. See also
+    <https://www.djangoproject.com/weblog/2007/oct/26/security-fix/>.
+    """
+    if lang_code:
+        # If 'fr-ca' is not supported, try special fallback or language-only 'fr'.
+        possible_lang_codes = [lang_code]
+        try:
+            possible_lang_codes.extend(LANG_INFO[lang_code]['fallback'])
+        except KeyError:
+            pass
+        generic_lang_code = lang_code.split('-')[0]
+        possible_lang_codes.append(generic_lang_code)
+        supported_lang_codes = get_languages()
+
+        for code in possible_lang_codes:
+            if code in supported_lang_codes and check_for_language(code):
+                return code
+        if not strict:
+            # if fr-fr is not supported, try fr-ca.
+            for supported_code in supported_lang_codes:
+                if supported_code.startswith(generic_lang_code + '-'):
+                    return supported_code
+    raise LookupError(lang_code)
+
+def get_language_from_path(path, strict=False):
+    """
+    From 1.11
+    Return the language-code if there is a valid language-code
     found in the `path`.
+
+    If `strict` is False (the default), the function will look for an alternative
+    country-specific variant when the currently checked is not found.
     """
-    if supported is None:
-        from django.conf import settings
-        supported = dict(settings.LANGUAGES)
     regex_match = language_code_prefix_re.match(path)
-    if regex_match:
-        lang_code = regex_match.group(1)
-        if lang_code in supported and check_for_language(lang_code):
-            return lang_code
+    if not regex_match:
+        return None
+    lang_code = regex_match.group(1)
+    try:
+        return get_supported_language_variant(lang_code, strict=strict)
+    except LookupError:
+        return None
 
 def get_language_from_request(request, check_path=False):
     """
+    Partially from 1.11
     Analyzes the request to find what language the user wants the system to
     show. Only languages listed in settings.LANGUAGES are taken into account.
     If the user requests a sublanguage where we have a main language, we send
@@ -393,45 +447,28 @@ def get_language_from_request(request, check_path=False):
 
     lang_code = request.COOKIES.get(settings.LANGUAGE_COOKIE_NAME)
 
-    if lang_code and lang_code not in supported:
-        lang_code = lang_code.split('-')[0] # e.g. if fr-ca is not supported fallback to fr
-
-    if lang_code and lang_code in supported and check_for_language(lang_code):
-        return lang_code
+    try:
+        return get_supported_language_variant(lang_code)
+    except LookupError:
+        pass
 
     accept = request.META.get('HTTP_ACCEPT_LANGUAGE', '')
     for accept_lang, unused in parse_accept_lang_header(accept):
         if accept_lang == '*':
             break
 
-        # We have a very restricted form for our language files (no encoding
-        # specifier, since they all must be UTF-8 and only one possible
-        # language each time. So we avoid the overhead of gettext.find() and
-        # work out the MO file manually.
-
-        # 'normalized' is the root name of the locale in POSIX format (which is
-        # the format used for the directories holding the MO files).
-        normalized = locale.locale_alias.get(to_locale(accept_lang, True))
-        if not normalized:
+        if not language_code_re.search(accept_lang):
             continue
-        # Remove the default encoding from locale_alias.
-        normalized = normalized.split('.')[0]
 
-        if normalized in _accepted:
-            # We've seen this locale before and have an MO file for it, so no
-            # need to check again.
-            return _accepted[normalized]
+        try:
+            return get_supported_language_variant(accept_lang)
+        except LookupError:
+            continue
 
-        for lang, dirname in ((accept_lang, normalized),
-                (accept_lang.split('-')[0], normalized.split('_')[0])):
-            if lang.lower() not in supported:
-                continue
-            for path in all_locale_paths():
-                if os.path.exists(os.path.join(path, dirname, 'LC_MESSAGES', 'django.mo')):
-                    _accepted[normalized] = lang
-                    return lang
-
-    return settings.LANGUAGE_CODE
+    try:
+        return get_supported_language_variant(settings.LANGUAGE_CODE)
+    except LookupError:
+        return settings.LANGUAGE_CODE
 
 dot_re = re.compile(r'\S')
 def blankout(src, char):
