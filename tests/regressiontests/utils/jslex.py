@@ -1,6 +1,6 @@
-"""Tests for jslex."""
 # encoding: utf-8
 # originally from https://bitbucket.org/ned/jslex
+"""Tests for jslex."""
 
 from django.test import TestCase
 from django.utils.jslex import JsLexer, prepare_js_for_gettext
