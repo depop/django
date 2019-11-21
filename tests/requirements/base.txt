@@ -2,7 +2,7 @@ bcrypt
 docutils
 numpy < 1.9
 Pillow
-PyYAML
+PyYAML < 5.1
 pytz > dev
 selenium
 sqlparse
