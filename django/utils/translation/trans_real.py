@@ -1,14 +1,16 @@
 """Translation helper functions."""
 from __future__ import unicode_literals
 
-import locale
 import os
 import re
 import sys
 import gettext as gettext_module
 from threading import local
 import warnings
+from collections import OrderedDict
 
+from django.conf import settings
+from django.conf.locale import LANG_INFO
 from django.utils.importlib import import_module
 from django.utils.datastructures import SortedDict
 from django.utils.encoding import force_str, force_text
@@ -40,9 +42,15 @@ CONTEXT_SEPARATOR = "\x04"
 # and RFC 3066, section 2.1
 accept_language_re = re.compile(r'''
         ([A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*|\*)      # "en", "en-au", "x-y-z", "es-419", "*"
-        (?:\s*;\s*q=(0(?:\.\d{,3})?|1(?:.0{,3})?))?   # Optional "q=1.00", "q=0.8"
+        (?:\s*;\s*q=(0(?:\.\d{,3})?|1(?:\.0{,3})?))?  # Optional "q=1.00", "q=0.8"
         (?:\s*,\s*|$)                                 # Multiple accepts per header.
         ''', re.VERBOSE)
+
+# From 1.11
+language_code_re = re.compile(
+    r'^[a-z]{1,8}(?:-[a-z0-9]{1,8})*(?:@[a-z0-9]{1,20})?$',
+    re.IGNORECASE
+)
 
 language_code_prefix_re = re.compile(r'^/([\w-]+)(/|$)')
 
@@ -360,6 +368,13 @@ def check_for_language(lang_code):
     return False
 check_for_language = memoize(check_for_language, _checked_languages, 1)
 
+def get_languages():
+    """
+    From 1.11
+    Cache of settings.LANGUAGES in an OrderedDict for easy lookups by key.
+    """
+    return OrderedDict(settings.LANGUAGES)
+
 def get_supported_language_variant(lang_code, supported=None, strict=False):
     """
     Returns the language-code that's listed in supported languages, possibly
@@ -409,6 +424,7 @@ def get_language_from_path(path, supported=None, strict=False):
 
 def get_language_from_request(request, check_path=False):
     """
+    Partially from 1.11
     Analyzes the request to find what language the user wants the system to
     show. Only languages listed in settings.LANGUAGES are taken into account.
     If the user requests a sublanguage where we have a main language, we send
@@ -419,7 +435,7 @@ def get_language_from_request(request, check_path=False):
     """
     global _accepted
     from django.conf import settings
-    supported = SortedDict(settings.LANGUAGES)
+    supported = dict(settings.LANGUAGES)
 
     if check_path:
         lang_code = get_language_from_path(request.path_info, supported)
@@ -434,7 +450,7 @@ def get_language_from_request(request, check_path=False):
     lang_code = request.COOKIES.get(settings.LANGUAGE_COOKIE_NAME)
 
     try:
-        return get_supported_language_variant(lang_code, supported)
+        return get_supported_language_variant(lang_code)
     except LookupError:
         pass
 
@@ -443,29 +459,16 @@ def get_language_from_request(request, check_path=False):
         if accept_lang == '*':
             break
 
-        # 'normalized' is the root name of the locale in POSIX format (which is
-        # the format used for the directories holding the MO files).
-        normalized = locale.locale_alias.get(to_locale(accept_lang, True))
-        if not normalized:
+        if not language_code_re.search(accept_lang):
             continue
-        # Remove the default encoding from locale_alias.
-        normalized = normalized.split('.')[0]
-
-        if normalized in _accepted:
-            # We've seen this locale before and have an MO file for it, so no
-            # need to check again.
-            return _accepted[normalized]
 
         try:
-            accept_lang = get_supported_language_variant(accept_lang, supported)
+            return get_supported_language_variant(accept_lang)
         except LookupError:
             continue
-        else:
-            _accepted[normalized] = accept_lang
-            return accept_lang
 
     try:
-        return get_supported_language_variant(settings.LANGUAGE_CODE, supported)
+        return get_supported_language_variant(settings.LANGUAGE_CODE)
     except LookupError:
         return settings.LANGUAGE_CODE
 

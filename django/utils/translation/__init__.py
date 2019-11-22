@@ -19,6 +19,8 @@ __all__ = [
     'ungettext', 'ungettext_lazy',
     'pgettext', 'pgettext_lazy',
     'npgettext', 'npgettext_lazy',
+    'get_supported_language_variant',
+    'get_languages',
 ]
 
 
@@ -194,3 +196,9 @@ def get_language_info(lang_code):
             return LANG_INFO[generic_lang_code]
         except KeyError:
             raise KeyError("Unknown language code %s and %s." % (lang_code, generic_lang_code))
+
+def get_supported_language_variant(lang_code, strict=False):
+    return _trans.get_supported_language_variant(lang_code, strict=strict)
+
+def get_languages():
+    return _trans.get_languages()

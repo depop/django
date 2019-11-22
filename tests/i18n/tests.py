@@ -32,7 +32,8 @@ from django.utils.translation import (activate, deactivate,
     ungettext, ungettext_lazy,
     pgettext, pgettext_lazy,
     npgettext, npgettext_lazy,
-    check_for_language)
+    check_for_language,
+    get_supported_language_variant, get_language_from_path, get_languages)
 from django.utils.unittest import skipUnless
 
 if find_command('xgettext'):
@@ -345,6 +346,71 @@ class TranslationTests(TransRealMixin, TestCase):
             t = Template('{% load i18n %}{% blocktrans %}My other name is {{ person }}.{% endblocktrans %}')
             rendered = t.render(Context({'person': 'James'}))
             self.assertEqual(rendered, 'My other name is James.')
+
+
+@override_settings(LANGUAGES=[('en', 'English'),
+                              ('en-gb', 'English'),
+                              ('en-us', 'English'),
+                              ('it', 'Italian'),
+                              ('it-it', 'Italian')])
+class TestLanguageParsing(TestCase):
+    def setUp(self):
+        self.rf = RequestFactory()
+
+    def test_get_supported_language_variant(self):
+        """
+        Tests the get_supported_language_variant function returns the correct language from unsupported language codes
+        """
+        lang = get_supported_language_variant('it-GB')
+        self.assertEqual(lang, 'it')
+        lang = get_supported_language_variant('en-IT')
+        self.assertEqual(lang, 'en')
+
+    def test_get_language_from_request(self):
+        """
+        Tests the get_language_from_request function returns a correct language even when unsupported language codes
+        are provided in the request headers
+        """
+        r = self.rf.get('/')
+        r.COOKIES = {}
+        r.META = {'HTTP_ACCEPT_LANGUAGE': 'en-us'}
+        lang = get_language_from_request(r)
+        self.assertEqual('en-us', lang)
+        r = self.rf.get('/')
+        r.COOKIES = {}
+        r.META = {'HTTP_ACCEPT_LANGUAGE': 'it-gb'}
+        lang = get_language_from_request(r)
+        self.assertEqual('it', lang)
+        r = self.rf.get('/')
+        r.COOKIES = {}
+        r.META = {'HTTP_ACCEPT_LANGUAGE': 'fr-fr'}
+        lang = get_language_from_request(r)
+        self.assertEqual('en', lang)
+        r = self.rf.get('/')
+        r.COOKIES = {}
+        r.META = {'HTTP_ACCEPT_LANGUAGE': 'it-au'}
+        lang = get_language_from_request(r)
+        self.assertEqual('it', lang)
+
+    def test_get_language_from_path(self):
+        """
+        Tests that get_language_from_path returns the correct language from the supported language codes or None
+        """
+        self.assertEqual(get_language_from_path('/en/'), 'en')
+        self.assertEqual(get_language_from_path('/en'), 'en')
+        self.assertIsNone(get_language_from_path('/xyz/'))
+        self.assertEqual(get_language_from_path('/it/'), 'it')
+        self.assertEqual(get_language_from_path('/it-gb/'), 'it')
+
+    def test_get_languages(self):
+        """
+        Tests that get_languages successfully returns an ordered dict of the languages defined in settings
+        """
+        langs = get_languages()
+        self.assertIn(langs['en'], 'English')
+        self.assertIn(langs['it'], 'Italian')
+        self.assertIn(langs['en-gb'], 'English')
+        self.assertIn(langs['it-it'], 'Italian')
 
 
 class TranslationThreadSafetyTests(TestCase):
