@@ -32,6 +32,7 @@ from django.utils.translation import (
     get_language_info, gettext, gettext_lazy, ngettext_lazy, npgettext,
     npgettext_lazy, pgettext, pgettext_lazy, string_concat, to_locale,
     trans_real, ugettext, ugettext_lazy, ungettext, ungettext_lazy,
+    get_supported_language_variant, get_language_from_path, get_languages,
 )
 
 from .forms import CompanyForm, I18nForm, SelectDateForm, SelectDateWidget
@@ -457,6 +458,71 @@ class TranslationTests(TestCase):
             t = Template('{% load i18n %}{% blocktrans %}My other name is {{ person }}.{% endblocktrans %}')
             rendered = t.render(Context({'person': 'James'}))
             self.assertEqual(rendered, 'My other name is James.')
+
+
+@override_settings(LANGUAGES=[('en', 'English'),
+                              ('en-gb', 'English'),
+                              ('en-us', 'English'),
+                              ('it', 'Italian'),
+                              ('it-it', 'Italian')])
+class TestLanguageParsing(TestCase):
+    def setUp(self):
+        self.rf = RequestFactory()
+
+    def test_get_supported_language_variant(self):
+        """
+        Tests the get_supported_language_variant function returns the correct language from unsupported language codes
+        """
+        lang = get_supported_language_variant('it-GB')
+        self.assertEqual(lang, 'it')
+        lang = get_supported_language_variant('en-IT')
+        self.assertEqual(lang, 'en')
+
+    def test_get_language_from_request(self):
+        """
+        Tests the get_language_from_request function returns a correct language even when unsupported language codes
+        are provided in the request headers
+        """
+        r = self.rf.get('/')
+        r.COOKIES = {}
+        r.META = {'HTTP_ACCEPT_LANGUAGE': 'en-us'}
+        lang = get_language_from_request(r)
+        self.assertEqual('en-us', lang)
+        r = self.rf.get('/')
+        r.COOKIES = {}
+        r.META = {'HTTP_ACCEPT_LANGUAGE': 'it-gb'}
+        lang = get_language_from_request(r)
+        self.assertEqual('it', lang)
+        r = self.rf.get('/')
+        r.COOKIES = {}
+        r.META = {'HTTP_ACCEPT_LANGUAGE': 'fr-fr'}
+        lang = get_language_from_request(r)
+        self.assertEqual('en', lang)
+        r = self.rf.get('/')
+        r.COOKIES = {}
+        r.META = {'HTTP_ACCEPT_LANGUAGE': 'it-au'}
+        lang = get_language_from_request(r)
+        self.assertEqual('it', lang)
+
+    def test_get_language_from_path(self):
+        """
+        Tests that get_language_from_path returns the correct language from the supported language codes or None
+        """
+        self.assertEqual(get_language_from_path('/en/'), 'en')
+        self.assertEqual(get_language_from_path('/en'), 'en')
+        self.assertIsNone(get_language_from_path('/xyz/'))
+        self.assertEqual(get_language_from_path('/it/'), 'it')
+        self.assertEqual(get_language_from_path('/it-gb/'), 'it')
+
+    def test_get_languages(self):
+        """
+        Tests that get_languages successfully returns an ordered dict of the languages defined in settings
+        """
+        langs = get_languages()
+        self.assertIn(langs['en'], 'English')
+        self.assertIn(langs['it'], 'Italian')
+        self.assertIn(langs['en-gb'], 'English')
+        self.assertIn(langs['it-it'], 'Italian')
 
 
 class TranslationThreadSafetyTests(TestCase):
@@ -986,8 +1052,9 @@ class MiscTests(TestCase):
         self.assertEqual([('en-au-xx', 1.0)], p('en-au-xx'))
         self.assertEqual([('de', 1.0), ('en-au', 0.75), ('en-us', 0.5), ('en', 0.25), ('es', 0.125), ('fa', 0.125)], p('de,en-au;q=0.75,en-us;q=0.5,en;q=0.25,es;q=0.125,fa;q=0.125'))
         self.assertEqual([('*', 1.0)], p('*'))
-        self.assertEqual([('de', 1.0)], p('de;q=0.'))
+        self.assertEqual([('de', 0.0)], p('de;q=0.'))
         self.assertEqual([('en', 1.0), ('*', 0.5)], p('en; q=1.0, * ; q=0.5'))
+        self.assertEqual([('en', 1.0)], p('en; q=1,'))
         self.assertEqual([], p(''))
 
         # Bad headers; should always return [].
@@ -1004,7 +1071,7 @@ class MiscTests(TestCase):
         self.assertEqual([], p('de;q=0.a'))
         self.assertEqual([], p('12-345'))
         self.assertEqual([], p(''))
-        self.assertEqual([], p('en; q=1,'))
+        self.assertEqual([], p('en;q=1e0'))
 
     def test_parse_literal_http_header(self):
         """

@@ -21,6 +21,8 @@ __all__ = [
     'pgettext', 'pgettext_lazy',
     'npgettext', 'npgettext_lazy',
     'LANGUAGE_SESSION_KEY',
+    'get_supported_language_variant',
+    'get_languages',
 ]
 
 LANGUAGE_SESSION_KEY = '_language'
@@ -240,3 +242,9 @@ trim_whitespace_re = re.compile('\s*\n\s*')
 
 def trim_whitespace(s):
     return trim_whitespace_re.sub(' ', s.strip())
+
+def get_supported_language_variant(lang_code, strict=False):
+    return _trans.get_supported_language_variant(lang_code, strict=strict)
+
+def get_languages():
+    return _trans.get_languages()
