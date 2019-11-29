@@ -9,6 +9,8 @@ import gettext as gettext_module
 from threading import local
 import warnings
 
+from django.conf import settings
+from django.conf.locale import LANG_INFO
 from django.apps import apps
 from django.core.exceptions import AppRegistryNotReady
 from django.dispatch import receiver
@@ -41,11 +43,16 @@ CONTEXT_SEPARATOR = "\x04"
 # and RFC 3066, section 2.1
 accept_language_re = re.compile(r'''
         ([A-Za-z]{1,8}(?:-[A-Za-z0-9]{1,8})*|\*)      # "en", "en-au", "x-y-z", "es-419", "*"
-        (?:\s*;\s*q=(0(?:\.\d{,3})?|1(?:.0{,3})?))?   # Optional "q=1.00", "q=0.8"
+        (?:\s*;\s*q=(0(?:\.\d{,3})?|1(?:\.0{,3})?))?  # Optional "q=1.00", "q=0.8"
         (?:\s*,\s*|$)                                 # Multiple accepts per header.
         ''', re.VERBOSE)
 
-language_code_re = re.compile(r'^[a-z]{1,8}(?:-[a-z0-9]{1,8})*$', re.IGNORECASE)
+# From 1.11
+language_code_re = re.compile(
+    r'^[a-z]{1,8}(?:-[a-z0-9]{1,8})*(?:@[a-z0-9]{1,20})?$',
+    re.IGNORECASE
+)
+
 
 language_code_prefix_re = re.compile(r'^/([\w-]+)(/|$)')
 
@@ -418,6 +425,15 @@ def check_for_language(lang_code):
     return False
 
 
+@lru_cache.lru_cache()
+def get_languages():
+    """
+    From 1.11
+    Cache of settings.LANGUAGES in an OrderedDict for easy lookups by key.
+    """
+    return OrderedDict(settings.LANGUAGES)
+
+
 @lru_cache.lru_cache(maxsize=1000)
 def get_supported_language_variant(lang_code, strict=False):
     """
@@ -742,11 +758,8 @@ def parse_accept_lang_header(lang_string):
         if first:
             return []
         if priority:
-            try:
-                priority = float(priority)
-            except ValueError:
-                return []
-        if not priority:        # if priority is 0.0 at this point make it 1.0
+            priority = float(priority)
+        else:
             priority = 1.0
         result.append((lang, priority))
     result.sort(key=lambda k: k[1], reverse=True)
