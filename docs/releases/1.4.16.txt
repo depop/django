@@ -11,10 +11,10 @@ Bugfixes
 ========
 
 * Allowed related many-to-many fields to be referenced in the admin
-  (:ticket:`23604`).
+  (`#23604 <http://code.djangoproject.com/ticket/23604>`_).
 
 * Allowed inline and hidden references to admin fields
-  (:ticket:`23431`).
+  (`#23431 <http://code.djangoproject.com/ticket/23431>`_).
 
 * Fixed parsing of the GEOS version string
-  (:ticket:`20036`).
+  (`#20036 <http://code.djangoproject.com/ticket/20036>`_).

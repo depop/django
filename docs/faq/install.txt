@@ -1,9 +1,8 @@
-=================
 FAQ: Installation
 =================
 
 How do I get started?
-=====================
+---------------------
 
 #. `Download the code`_.
 #. Install Django (read the :doc:`installation guide </intro/install>`).
@@ -15,76 +14,94 @@ How do I get started?
 .. _ask questions: https://www.djangoproject.com/community/
 
 What are Django's prerequisites?
-================================
+--------------------------------
 
-Django requires Python. See the table in the next question for the versions of
-Python that work with each version of Django. Other Python libraries may be
-required for some uses, but you'll receive an error about it as they're needed.
+Django requires Python_, specifically any version of Python from 2.5
+through 2.7. No other Python libraries are required for basic Django
+usage.
 
 For a development environment -- if you just want to experiment with Django --
 you don't need to have a separate Web server installed; Django comes with its
 own lightweight development server. For a production environment, Django follows
 the WSGI spec, :pep:`3333`, which means it can run on a variety of server
 platforms. See :doc:`Deploying Django </howto/deployment/index>` for some
-popular alternatives.
+popular alternatives. Also, the `server arrangements wiki page`_ contains
+details for several deployment strategies.
 
 If you want to use Django with a database, which is probably the case, you'll
 also need a database engine. PostgreSQL_ is recommended, because we're
 PostgreSQL fans, and MySQL_, `SQLite 3`_, and Oracle_ are also supported.
 
-.. _Python: https://www.python.org/
-.. _PostgreSQL: https://www.postgresql.org/
-.. _MySQL: https://www.mysql.com/
-.. _`SQLite 3`: https://www.sqlite.org/
+.. _Python: http://www.python.org/
+.. _server arrangements wiki page: https://code.djangoproject.com/wiki/ServerArrangements
+.. _PostgreSQL: http://www.postgresql.org/
+.. _MySQL: http://www.mysql.com/
+.. _`SQLite 3`: http://www.sqlite.org/
 .. _Oracle: http://www.oracle.com/
 
-.. _faq-python-version-support:
+Do I lose anything by using Python 2.5 versus newer Python versions, such as Python 2.6 or 2.7?
+-----------------------------------------------------------------------------------------------
+
+Not in the core framework. Currently, Django itself officially supports any
+version of Python from 2.5 through 2.7, inclusive. However, newer versions of
+Python are often faster, have more features, and are better supported. If you
+use a newer version of Python you will also have access to some APIs that
+aren't available under older versions of Python. For example, since Python 2.6,
+you can use the advanced string formatting described in :pep:`3101`.
+
+Third-party applications for use with Django are, of course, free to set their
+own version requirements.
+
+Over the next year or two Django will begin dropping support for older Python
+versions as part of a migration which will end with Django running on Python 3
+(see below for details).
+
+All else being equal, we recommend that you use the latest 2.x release
+(currently Python 2.7). This will let you take advantage of the numerous
+improvements and optimizations to the Python language since version 2.5, and
+will help ease the process of dropping support for older Python versions on
+the road to Python 3.
 
 What Python version can I use with Django?
-==========================================
+------------------------------------------
 
 ============== ===============
 Django version Python versions
 ============== ===============
-1.8            2.7, 3.2 (until the end of 2016), 3.3, 3.4, 3.5
-1.9, 1.10      2.7, 3.4, 3.5
-1.11           2.7, 3.4, 3.5, 3.6
-2.0            3.5+
+1.0            2.3, 2.4, 2.5, 2.6
+1.1            2.3, 2.4, 2.5, 2.6
+1.2            2.4, 2.5, 2.6, 2.7
+1.3            2.4, 2.5, 2.6, 2.7
+**1.4**        **2.5, 2.6, 2.7**
+*1.5 (future)* *2.6, 2.7, 3.x (experimental)*
 ============== ===============
 
-For each version of Python, only the latest micro release (A.B.C) is officially
-supported. You can find the latest micro version for each series on the `Python
-download page <https://www.python.org/downloads/>`_.
+Can I use Django with Python 3?
+-------------------------------
 
-Typically, we will support a Python version up to and including the first
-Django LTS release whose security support ends after security support for that
-version of Python ends. For example, Python 3.3 security support ends September
-2017 and Django 1.8 LTS security support ends April 2018. Therefore Django 1.8
-is the last version to support Python 3.3.
+Not at the moment. Python 3.0 introduced a number of
+backwards-incompatible changes to the Python language, and although
+these changes are generally a good thing for Python's future, it will
+be a while before most Python software catches up and is able to run
+on Python 3.0. For larger Python-based software like Django, the
+transition is expected to take at least a year or two (since it
+involves dropping support for older Python releases and so must be
+done gradually).
 
-What Python version should I use with Django?
-=============================================
+In the meantime, Python 2.x releases will be supported and provided
+with bug fixes and security updates by the Python development team, so
+continuing to use a Python 2.x release during the transition should
+not present any risk.
 
-As of Django 1.6, Python 3 support is considered stable and you can safely use
-it in production. See also :doc:`/topics/python3`. However, the community is
-still in the process of migrating third-party packages and applications to
-Python 3.
+Will Django run under shared hosting (like TextDrive or Dreamhost)?
+-------------------------------------------------------------------
 
-If you're starting a new project, and the dependencies you plan to use work on
-Python 3, you should use Python 3. If they don't, consider contributing to the
-porting efforts, or stick to Python 2.
+See our `Django-friendly Web hosts`_ page.
 
-Since newer versions of Python are often faster, have more features, and are
-better supported, all else being equal, we recommend that you use the latest
-2.x.y or 3.x.y release.
-
-You don't lose anything in Django by using an older release, but you don't take
-advantage of the improvements and optimizations in newer Python releases.
-Third-party applications for use with Django are, of course, free to set their
-own version requirements.
+.. _`Django-friendly Web hosts`: https://code.djangoproject.com/wiki/DjangoFriendlyWebHosts
 
 Should I use the stable version or development version?
-=======================================================
+-------------------------------------------------------
 
 Generally, if you're using code in production, you should be using a
 stable release. The Django project publishes a full stable release

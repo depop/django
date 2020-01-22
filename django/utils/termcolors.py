@@ -2,15 +2,12 @@
 termcolors.py
 """
 
-from django.utils import six
-
 color_names = ('black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white')
-foreground = {color_names[x]: '3%s' % x for x in range(8)}
-background = {color_names[x]: '4%s' % x for x in range(8)}
+foreground = dict([(color_names[x], '3%s' % x) for x in range(8)])
+background = dict([(color_names[x], '4%s' % x) for x in range(8)])
 
 RESET = '0'
 opt_dict = {'bold': '1', 'underscore': '4', 'blink': '5', 'reverse': '7', 'conceal': '8'}
-
 
 def colorize(text='', opts=(), **kwargs):
     """
@@ -36,15 +33,15 @@ def colorize(text='', opts=(), **kwargs):
         colorize('hello', fg='red', bg='blue', opts=('blink',))
         colorize()
         colorize('goodbye', opts=('underscore',))
-        print(colorize('first line', fg='red', opts=('noreset',)))
-        print('this should be red too')
-        print(colorize('and so should this'))
-        print('this should not be red')
+        print colorize('first line', fg='red', opts=('noreset',))
+        print 'this should be red too'
+        print colorize('and so should this')
+        print 'this should not be red'
     """
     code_list = []
     if text == '' and len(opts) == 1 and opts[0] == 'reset':
         return '\x1b[%sm' % RESET
-    for k, v in six.iteritems(kwargs):
+    for k, v in kwargs.iteritems():
         if k == 'fg':
             code_list.append(foreground[v])
         elif k == 'bg':
@@ -53,9 +50,8 @@ def colorize(text='', opts=(), **kwargs):
         if o in opt_dict:
             code_list.append(opt_dict[o])
     if 'noreset' not in opts:
-        text = '%s\x1b[%sm' % (text or '', RESET)
-    return '%s%s' % (('\x1b[%sm' % ';'.join(code_list)), text or '')
-
+        text = text + '\x1b[%sm' % RESET
+    return ('\x1b[%sm' % ';'.join(code_list)) + text
 
 def make_style(opts=(), **kwargs):
     """
@@ -63,7 +59,7 @@ def make_style(opts=(), **kwargs):
 
     Example:
         bold_red = make_style(opts=('bold',), fg='red')
-        print(bold_red('hello'))
+        print bold_red('hello')
         KEYWORD = make_style(fg='yellow')
         COMMENT = make_style(fg='blue', opts=('bold',))
     """
@@ -75,70 +71,57 @@ LIGHT_PALETTE = 'light'
 
 PALETTES = {
     NOCOLOR_PALETTE: {
-        'ERROR': {},
-        'SUCCESS': {},
-        'WARNING': {},
-        'NOTICE': {},
-        'SQL_FIELD': {},
-        'SQL_COLTYPE': {},
-        'SQL_KEYWORD': {},
-        'SQL_TABLE': {},
-        'HTTP_INFO': {},
-        'HTTP_SUCCESS': {},
-        'HTTP_REDIRECT': {},
+        'ERROR':        {},
+        'NOTICE':       {},
+        'SQL_FIELD':    {},
+        'SQL_COLTYPE':  {},
+        'SQL_KEYWORD':  {},
+        'SQL_TABLE':    {},
+        'HTTP_INFO':         {},
+        'HTTP_SUCCESS':      {},
+        'HTTP_REDIRECT':     {},
         'HTTP_NOT_MODIFIED': {},
-        'HTTP_BAD_REQUEST': {},
-        'HTTP_NOT_FOUND': {},
+        'HTTP_BAD_REQUEST':  {},
+        'HTTP_NOT_FOUND':    {},
         'HTTP_SERVER_ERROR': {},
-        'MIGRATE_HEADING': {},
-        'MIGRATE_LABEL': {},
     },
     DARK_PALETTE: {
-        'ERROR': {'fg': 'red', 'opts': ('bold',)},
-        'SUCCESS': {'fg': 'green', 'opts': ('bold',)},
-        'WARNING': {'fg': 'yellow', 'opts': ('bold',)},
-        'NOTICE': {'fg': 'red'},
-        'SQL_FIELD': {'fg': 'green', 'opts': ('bold',)},
-        'SQL_COLTYPE': {'fg': 'green'},
-        'SQL_KEYWORD': {'fg': 'yellow'},
-        'SQL_TABLE': {'opts': ('bold',)},
-        'HTTP_INFO': {'opts': ('bold',)},
-        'HTTP_SUCCESS': {},
-        'HTTP_REDIRECT': {'fg': 'green'},
-        'HTTP_NOT_MODIFIED': {'fg': 'cyan'},
-        'HTTP_BAD_REQUEST': {'fg': 'red', 'opts': ('bold',)},
-        'HTTP_NOT_FOUND': {'fg': 'yellow'},
-        'HTTP_SERVER_ERROR': {'fg': 'magenta', 'opts': ('bold',)},
-        'MIGRATE_HEADING': {'fg': 'cyan', 'opts': ('bold',)},
-        'MIGRATE_LABEL': {'opts': ('bold',)},
+        'ERROR':        { 'fg': 'red', 'opts': ('bold',) },
+        'NOTICE':       { 'fg': 'red' },
+        'SQL_FIELD':    { 'fg': 'green', 'opts': ('bold',) },
+        'SQL_COLTYPE':  { 'fg': 'green' },
+        'SQL_KEYWORD':  { 'fg': 'yellow' },
+        'SQL_TABLE':    { 'opts': ('bold',) },
+        'HTTP_INFO':         { 'opts': ('bold',) },
+        'HTTP_SUCCESS':      { },
+        'HTTP_REDIRECT':     { 'fg': 'green' },
+        'HTTP_NOT_MODIFIED': { 'fg': 'cyan' },
+        'HTTP_BAD_REQUEST':  { 'fg': 'red', 'opts': ('bold',) },
+        'HTTP_NOT_FOUND':    { 'fg': 'yellow' },
+        'HTTP_SERVER_ERROR': { 'fg': 'magenta', 'opts': ('bold',) },
     },
     LIGHT_PALETTE: {
-        'ERROR': {'fg': 'red', 'opts': ('bold',)},
-        'SUCCESS': {'fg': 'green', 'opts': ('bold',)},
-        'WARNING': {'fg': 'yellow', 'opts': ('bold',)},
-        'NOTICE': {'fg': 'red'},
-        'SQL_FIELD': {'fg': 'green', 'opts': ('bold',)},
-        'SQL_COLTYPE': {'fg': 'green'},
-        'SQL_KEYWORD': {'fg': 'blue'},
-        'SQL_TABLE': {'opts': ('bold',)},
-        'HTTP_INFO': {'opts': ('bold',)},
-        'HTTP_SUCCESS': {},
-        'HTTP_REDIRECT': {'fg': 'green', 'opts': ('bold',)},
-        'HTTP_NOT_MODIFIED': {'fg': 'green'},
-        'HTTP_BAD_REQUEST': {'fg': 'red', 'opts': ('bold',)},
-        'HTTP_NOT_FOUND': {'fg': 'red'},
-        'HTTP_SERVER_ERROR': {'fg': 'magenta', 'opts': ('bold',)},
-        'MIGRATE_HEADING': {'fg': 'cyan', 'opts': ('bold',)},
-        'MIGRATE_LABEL': {'opts': ('bold',)},
+        'ERROR':        { 'fg': 'red', 'opts': ('bold',) },
+        'NOTICE':       { 'fg': 'red' },
+        'SQL_FIELD':    { 'fg': 'green', 'opts': ('bold',) },
+        'SQL_COLTYPE':  { 'fg': 'green' },
+        'SQL_KEYWORD':  { 'fg': 'blue' },
+        'SQL_TABLE':    { 'opts': ('bold',) },
+        'HTTP_INFO':         { 'opts': ('bold',) },
+        'HTTP_SUCCESS':      { },
+        'HTTP_REDIRECT':     { 'fg': 'green', 'opts': ('bold',) },
+        'HTTP_NOT_MODIFIED': { 'fg': 'green' },
+        'HTTP_BAD_REQUEST':  { 'fg': 'red', 'opts': ('bold',) },
+        'HTTP_NOT_FOUND':    { 'fg': 'red' },
+        'HTTP_SERVER_ERROR': { 'fg': 'magenta', 'opts': ('bold',) },
     }
 }
 DEFAULT_PALETTE = DARK_PALETTE
 
-
 def parse_color_setting(config_string):
     """Parse a DJANGO_COLORS environment variable to produce the system palette
 
-    The general form of a palette definition is:
+    The general form of a pallete definition is:
 
         "palette;role=fg;role=fg/bg;role=fg,option,option;role=fg/bg,option,option"
 
@@ -150,21 +133,20 @@ def parse_color_setting(config_string):
         option is a display options.
 
     Specifying a named palette is the same as manually specifying the individual
-    definitions for each role. Any individual definitions following the palette
+    definitions for each role. Any individual definitions following the pallete
     definition will augment the base palette definition.
 
     Valid roles:
-        'error', 'success', 'warning', 'notice', 'sql_field', 'sql_coltype',
-        'sql_keyword', 'sql_table', 'http_info', 'http_success',
-        'http_redirect', 'http_not_modified', 'http_bad_request',
-        'http_not_found', 'http_server_error', 'migrate_heading',
-        'migrate_label'
+        'error', 'notice', 'sql_field', 'sql_coltype', 'sql_keyword', 'sql_table',
+        'http_info', 'http_success', 'http_redirect', 'http_bad_request',
+        'http_not_found', 'http_server_error'
 
     Valid colors:
         'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'
 
     Valid options:
-        'bold', 'underscore', 'blink', 'reverse', 'conceal', 'noreset'
+        'bold', 'underscore', 'blink', 'reverse', 'conceal'
+
     """
     if not config_string:
         return PALETTES[DEFAULT_PALETTE]

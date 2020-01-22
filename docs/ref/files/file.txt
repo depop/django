@@ -1,4 +1,3 @@
-===================
 The ``File`` object
 ===================
 
@@ -7,20 +6,20 @@ for basic file handling in Django.
 
 .. currentmodule:: django.core.files
 
-The ``File`` class
-==================
+The ``File`` Class
+------------------
 
 .. class:: File(file_object)
 
-    The :class:`File` class is a thin wrapper around a Python
-    :py:term:`file object` with some Django-specific additions.
-    Internally, Django uses this class when it needs to represent a file.
-
+    The :class:`File` is a thin wrapper around Python's built-in file object
+    with some Django-specific additions. Internally, Django uses this class
+    any time it needs to represent a file.
+    
     :class:`File` objects have the following attributes and methods:
 
     .. attribute:: name
 
-        The name of the file including the relative path from
+        The name of file including the relative path from
         :setting:`MEDIA_ROOT`.
 
     .. attribute:: size
@@ -29,34 +28,24 @@ The ``File`` class
 
     .. attribute:: file
 
-        The underlying :py:term:`file object` that this class wraps.
-
-        .. admonition:: Be careful with this attribute in subclasses.
-
-            Some subclasses of :class:`File`, including
-            :class:`~django.core.files.base.ContentFile` and
-            :class:`~django.db.models.fields.files.FieldFile`, may replace this
-            attribute with an object other than a Python :py:term:`file object`.
-            In these cases, this attribute may itself be a :class:`File`
-            subclass (and not necessarily the same subclass). Whenever
-            possible, use the attributes and methods of the subclass itself
-            rather than the those of the subclass's ``file`` attribute.
+        The underlying Python ``file`` object passed to
+        :class:`~django.core.files.File`.
 
     .. attribute:: mode
 
         The read/write mode for the file.
 
-    .. method:: open(mode=None)
+    .. method:: open([mode=None])
 
-        Open or reopen the file (which also does ``File.seek(0)``).
-        The ``mode`` argument allows the same values
-        as Python's built-in :func:`python:open()`.
+        Open or reopen the file (which by definition also does
+        ``File.seek(0)``). The ``mode`` argument allows the same values
+        as Python's standard ``open()``.
 
         When reopening a file, ``mode`` will override whatever mode the file
         was originally opened with; ``None`` means to reopen with the original
         mode.
 
-    .. method:: read(num_bytes=None)
+    .. method:: read([num_bytes=None])
 
         Read content from the file. The optional ``size`` is the number of
         bytes to read; if not specified, the file will be read to the end.
@@ -65,7 +54,7 @@ The ``File`` class
 
         Iterate over the file yielding one line at a time.
 
-    .. method:: chunks(chunk_size=None)
+    .. method:: chunks([chunk_size=None])
 
         Iterate over the file yielding "chunks" of a given size. ``chunk_size``
         defaults to 64 KB.
@@ -73,54 +62,47 @@ The ``File`` class
         This is especially useful with very large files since it allows them to
         be streamed off disk and avoids storing the whole file in memory.
 
-    .. method:: multiple_chunks(chunk_size=None)
+    .. method:: multiple_chunks([chunk_size=None])
 
         Returns ``True`` if the file is large enough to require multiple chunks
         to access all of its content give some ``chunk_size``.
 
-    .. method:: write(content)
+    .. method:: write([content])
 
         Writes the specified content string to the file. Depending on the
         storage system behind the scenes, this content might not be fully
-        committed until :func:`close()` is called on the file.
+        committed until ``close()`` is called on the file.
 
     .. method:: close()
 
         Close the file.
 
     In addition to the listed methods, :class:`~django.core.files.File` exposes
-    the following attributes and methods of its ``file`` object:
+    the following attributes and methods of the underlying ``file`` object:
     ``encoding``, ``fileno``, ``flush``, ``isatty``, ``newlines``,
     ``read``, ``readinto``, ``readlines``, ``seek``, ``softspace``, ``tell``,
-    ``truncate``, ``writelines``, ``xreadlines``, ``readable()``,
-    ``writable()``, and ``seekable()``.
-
-    .. versionchanged:: 1.11
-
-        The ``readable()`` and ``writable()`` methods were added and the
-        ``seekable()`` method was made available on Python 2.
+    ``truncate``, ``writelines``, ``xreadlines``.
 
 .. currentmodule:: django.core.files.base
 
-The ``ContentFile`` class
-=========================
+The ``ContentFile`` Class
+-------------------------
 
 .. class:: ContentFile(File)
 
     The ``ContentFile`` class inherits from :class:`~django.core.files.File`,
-    but unlike :class:`~django.core.files.File` it operates on string content
-    (bytes also supported), rather than an actual file. For example::
+    but unlike :class:`~django.core.files.File` it operates on string content,
+    rather than an actual file. For example::
 
-        from __future__ import unicode_literals
         from django.core.files.base import ContentFile
 
-        f1 = ContentFile("esta sentencia está en español")
-        f2 = ContentFile(b"these are bytes")
+        f1 = ContentFile("my string content")
+        f2 = ContentFile(u"my unicode content encoded as UTF-8".encode('UTF-8'))
 
 .. currentmodule:: django.core.files.images
 
-The ``ImageFile`` class
-=======================
+The ``ImageFile`` Class
+-----------------------
 
 .. class:: ImageFile(file_object)
 
@@ -140,12 +122,12 @@ The ``ImageFile`` class
 .. currentmodule:: django.core.files
 
 Additional methods on files attached to objects
-===============================================
+-----------------------------------------------
 
-Any :class:`File` that is associated with an object (as with ``Car.photo``,
+Any :class:`File` that's associated with an object (as with ``Car.photo``,
 below) will also have a couple of extra methods:
 
-.. method:: File.save(name, content, save=True)
+.. method:: File.save(name, content, [save=True])
 
     Saves a new file with the file name and contents provided. This will not
     replace the existing file, but will create a new file and update the object
@@ -155,15 +137,15 @@ below) will also have a couple of extra methods:
         >>> car.photo.save('myphoto.jpg', content, save=False)
         >>> car.save()
 
-    are equivalent to::
+    are the same as this one line::
 
         >>> car.photo.save('myphoto.jpg', content, save=True)
 
     Note that the ``content`` argument must be an instance of either
     :class:`File` or of a subclass of :class:`File`, such as
-    :class:`~django.core.files.base.ContentFile`.
+    :class:`ContentFile`.
 
-.. method:: File.delete(save=True)
+.. method:: File.delete([save=True])
 
     Removes the file from the model instance and deletes the underlying file.
     If ``save`` is ``True``, the model's ``save()`` method will be called once

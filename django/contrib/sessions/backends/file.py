@@ -1,18 +1,10 @@
-import datetime
 import errno
-import logging
 import os
-import shutil
 import tempfile
 
 from django.conf import settings
-from django.contrib.sessions.backends.base import (
-    VALID_KEY_CHARS, CreateError, SessionBase, UpdateError,
-)
-from django.contrib.sessions.exceptions import InvalidSessionKey
-from django.core.exceptions import ImproperlyConfigured, SuspiciousOperation
-from django.utils import timezone
-from django.utils.encoding import force_text
+from django.contrib.sessions.backends.base import SessionBase, CreateError
+from django.core.exceptions import SuspiciousOperation, ImproperlyConfigured
 
 
 class SessionStore(SessionBase):
@@ -20,28 +12,21 @@ class SessionStore(SessionBase):
     Implements a file based session store.
     """
     def __init__(self, session_key=None):
-        self.storage_path = type(self)._get_storage_path()
+        self.storage_path = getattr(settings, "SESSION_FILE_PATH", None)
+        if not self.storage_path:
+            self.storage_path = tempfile.gettempdir()
+
+        # Make sure the storage path is valid.
+        if not os.path.isdir(self.storage_path):
+            raise ImproperlyConfigured(
+                "The session storage path %r doesn't exist. Please set your"
+                " SESSION_FILE_PATH setting to an existing directory in which"
+                " Django can store session data." % self.storage_path)
+
         self.file_prefix = settings.SESSION_COOKIE_NAME
         super(SessionStore, self).__init__(session_key)
 
-    @classmethod
-    def _get_storage_path(cls):
-        try:
-            return cls._storage_path
-        except AttributeError:
-            storage_path = getattr(settings, "SESSION_FILE_PATH", None)
-            if not storage_path:
-                storage_path = tempfile.gettempdir()
-
-            # Make sure the storage path is valid.
-            if not os.path.isdir(storage_path):
-                raise ImproperlyConfigured(
-                    "The session storage path %r doesn't exist. Please set your"
-                    " SESSION_FILE_PATH setting to an existing directory in which"
-                    " Django can store session data." % storage_path)
-
-            cls._storage_path = storage_path
-            return storage_path
+    VALID_KEY_CHARS = set("abcdef0123456789")
 
     def _key_to_file(self, session_key=None):
         """
@@ -53,56 +38,28 @@ class SessionStore(SessionBase):
         # Make sure we're not vulnerable to directory traversal. Session keys
         # should always be md5s, so they should never contain directory
         # components.
-        if not set(session_key).issubset(set(VALID_KEY_CHARS)):
-            raise InvalidSessionKey(
+        if not set(session_key).issubset(self.VALID_KEY_CHARS):
+            raise SuspiciousOperation(
                 "Invalid characters in session key")
 
         return os.path.join(self.storage_path, self.file_prefix + session_key)
 
-    def _last_modification(self):
-        """
-        Return the modification time of the file storing the session's content.
-        """
-        modification = os.stat(self._key_to_file()).st_mtime
-        if settings.USE_TZ:
-            modification = datetime.datetime.utcfromtimestamp(modification)
-            modification = modification.replace(tzinfo=timezone.utc)
-        else:
-            modification = datetime.datetime.fromtimestamp(modification)
-        return modification
-
-    def _expiry_date(self, session_data):
-        """
-        Return the expiry time of the file storing the session's content.
-        """
-        expiry = session_data.get('_session_expiry')
-        if not expiry:
-            expiry = self._last_modification() + datetime.timedelta(seconds=settings.SESSION_COOKIE_AGE)
-        return expiry
-
     def load(self):
         session_data = {}
         try:
-            with open(self._key_to_file(), "rb") as session_file:
+            session_file = open(self._key_to_file(), "rb")
+            try:
                 file_data = session_file.read()
-            # Don't fail if there is no data in the session file.
-            # We may have opened the empty placeholder file.
-            if file_data:
-                try:
-                    session_data = self.decode(file_data)
-                except (EOFError, SuspiciousOperation) as e:
-                    if isinstance(e, SuspiciousOperation):
-                        logger = logging.getLogger('django.security.%s' % e.__class__.__name__)
-                        logger.warning(force_text(e))
-                    self.create()
-
-                # Remove expired sessions.
-                expiry_age = self.get_expiry_age(expiry=self._expiry_date(session_data))
-                if expiry_age <= 0:
-                    session_data = {}
-                    self.delete()
-                    self.create()
-        except (IOError, SuspiciousOperation):
+                # Don't fail if there is no data in the session file.
+                # We may have opened the empty placeholder file.
+                if file_data:
+                    try:
+                        session_data = self.decode(file_data)
+                    except (EOFError, SuspiciousOperation):
+                        self._session_key = None
+            finally:
+                session_file.close()
+        except IOError:
             self._session_key = None
         return session_data
 
@@ -128,17 +85,15 @@ class SessionStore(SessionBase):
         try:
             # Make sure the file exists.  If it does not already exist, an
             # empty placeholder file is created.
-            flags = os.O_WRONLY | getattr(os, 'O_BINARY', 0)
+            flags = os.O_WRONLY | os.O_CREAT | getattr(os, 'O_BINARY', 0)
             if must_create:
-                flags |= os.O_EXCL | os.O_CREAT
+                flags |= os.O_EXCL
             fd = os.open(session_file_name, flags)
             os.close(fd)
 
-        except OSError as e:
+        except OSError, e:
             if must_create and e.errno == errno.EEXIST:
                 raise CreateError
-            if not must_create and e.errno == errno.ENOENT:
-                raise UpdateError
             raise
 
         # Write the session file without interfering with other threads
@@ -159,18 +114,15 @@ class SessionStore(SessionBase):
         dir, prefix = os.path.split(session_file_name)
 
         try:
-            output_file_fd, output_file_name = tempfile.mkstemp(dir=dir, prefix=prefix + '_out_')
+            output_file_fd, output_file_name = tempfile.mkstemp(dir=dir,
+                prefix=prefix + '_out_')
             renamed = False
             try:
                 try:
-                    os.write(output_file_fd, self.encode(session_data).encode())
+                    os.write(output_file_fd, self.encode(session_data))
                 finally:
                     os.close(output_file_fd)
-
-                # This will atomically rename the file (os.rename) if the OS
-                # supports it. Otherwise this will result in a shutil.copy2
-                # and os.unlink (for example on Windows). See #9084.
-                shutil.move(output_file_name, session_file_name)
+                os.rename(output_file_name, session_file_name)
                 renamed = True
             finally:
                 if not renamed:
@@ -194,19 +146,3 @@ class SessionStore(SessionBase):
 
     def clean(self):
         pass
-
-    @classmethod
-    def clear_expired(cls):
-        storage_path = cls._get_storage_path()
-        file_prefix = settings.SESSION_COOKIE_NAME
-
-        for session_file in os.listdir(storage_path):
-            if not session_file.startswith(file_prefix):
-                continue
-            session_key = session_file[len(file_prefix):]
-            session = cls(session_key)
-            # When an expired session is loaded, its file is removed, and a
-            # new file is immediately created. Prevent this by disabling
-            # the create() method.
-            session.create = lambda: None
-            session.load()

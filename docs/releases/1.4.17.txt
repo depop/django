@@ -13,4 +13,5 @@ Bugfixes
 ========
 
 * Fixed a regression with dynamically generated inlines and allowed field
-  references in the admin (:ticket:`23754`).
+  references in the admin
+  (`#23754 <http://code.djangoproject.com/ticket/23754>`_).

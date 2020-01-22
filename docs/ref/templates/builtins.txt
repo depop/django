@@ -10,14 +10,14 @@ documentation for any custom tags or filters installed.
 .. _ref-templates-builtins-tags:
 
 Built-in tag reference
-======================
+----------------------
 
-.. highlight:: html+django
+.. highlightlang:: html+django
 
 .. templatetag:: autoescape
 
-``autoescape``
---------------
+autoescape
+^^^^^^^^^^
 
 Controls the current auto-escaping behavior. This tag takes either ``on`` or
 ``off`` as an argument and that determines whether auto-escaping is in effect
@@ -40,49 +40,38 @@ Sample usage::
 
 .. templatetag:: block
 
-``block``
----------
+block
+^^^^^
 
 Defines a block that can be overridden by child templates. See
 :ref:`Template inheritance <template-inheritance>` for more information.
 
 .. templatetag:: comment
 
-``comment``
------------
+comment
+^^^^^^^
 
 Ignores everything between ``{% comment %}`` and ``{% endcomment %}``.
-An optional note may be inserted in the first tag. For example, this is
-useful when commenting out code for documenting why the code was disabled.
-
-Sample usage::
-
-    <p>Rendered text with {{ pub_date|date:"c" }}</p>
-    {% comment "Optional note" %}
-        <p>Commented out text with {{ create_date|date:"c" }}</p>
-    {% endcomment %}
-
-``comment`` tags cannot be nested.
 
 .. templatetag:: csrf_token
 
-``csrf_token``
---------------
+csrf_token
+^^^^^^^^^^
 
-This tag is used for CSRF protection, as described in the documentation for
-:doc:`Cross Site Request Forgeries </ref/csrf>`.
+In the Django 1.1.X series, this is a no-op tag that returns an empty string
+for future compatibility purposes.  In Django 1.2 and later, it is used for
+CSRF protection, as described in the documentation for :doc:`Cross Site Request
+Forgeries </ref/contrib/csrf>`.
 
 .. templatetag:: cycle
 
-``cycle``
----------
+cycle
+^^^^^
 
-Produces one of its arguments each time this tag is encountered. The first
-argument is produced on the first encounter, the second argument on the second
-encounter, and so forth. Once all arguments are exhausted, the tag cycles to
-the first argument and produces it again.
+Cycles among the given strings or variables each time this tag is encountered.
 
-This tag is particularly useful in a loop::
+Within a loop, cycles among the given strings each time through the
+loop::
 
     {% for o in some_list %}
         <tr class="{% cycle 'row1' 'row2' %}">
@@ -90,13 +79,8 @@ This tag is particularly useful in a loop::
         </tr>
     {% endfor %}
 
-The first iteration produces HTML that refers to class ``row1``, the second to
-``row2``, the third to ``row1`` again, and so on for each iteration of the
-loop.
-
 You can use variables, too. For example, if you have two template variables,
-``rowvalue1`` and ``rowvalue2``, you can alternate between their values like
-this::
+``rowvalue1`` and ``rowvalue2``, you can cycle between their values like this::
 
     {% for o in some_list %}
         <tr class="{% cycle rowvalue1 rowvalue2 %}">
@@ -104,11 +88,12 @@ this::
         </tr>
     {% endfor %}
 
-Variables included in the cycle will be escaped.  You can disable auto-escaping
-with::
+Note that variable arguments (``rowvalue1`` and ``rowvalue2`` above) are NOT
+auto-escaped! So either make sure that you trust their values, or use explicit
+escaping, like this::
 
     {% for o in some_list %}
-        <tr class="{% autoescape off %}{% cycle rowvalue1 rowvalue2 %}{% endautoescape %}">
+        <tr class="{% filter force_escape %}{% cycle rowvalue1 rowvalue2 %}{% endfilter %}">
             ...
         </tr>
     {% endfor %}
@@ -121,17 +106,17 @@ You can mix variables and strings::
         </tr>
     {% endfor %}
 
-In some cases you might want to refer to the current value of a cycle
-without advancing to the next value. To do this,
-just give the ``{% cycle %}`` tag a name, using "as", like this::
+In some cases you might want to refer to the next value of a cycle from
+outside of a loop. To do this, just give the ``{% cycle %}`` tag a name, using
+"as", like this::
 
     {% cycle 'row1' 'row2' as rowcolors %}
 
-From then on, you can insert the current value of the cycle wherever you'd like
-in your template by referencing the cycle name as a context variable. If you
-want to move the cycle to the next value independently of the original
-``cycle`` tag, you can use another ``cycle`` tag and specify the name of the
-variable. So, the following template::
+From then on, you can insert the current value of the cycle wherever
+you'd like in your template by referencing the cycle name as a context
+variable. If you want to move the cycle onto the next value, you use
+the cycle tag again, using the name of the variable. So, the following
+template::
 
     <tr>
         <td class="{% cycle 'row1' 'row2' as rowcolors %}">...</td>
@@ -153,53 +138,67 @@ would output::
         <td class="row2">...</td>
     </tr>
 
-You can use any number of values in a ``cycle`` tag, separated by spaces.
-Values enclosed in single quotes (``'``) or double quotes (``"``) are treated
-as string literals, while values without quotes are treated as template
-variables.
+You can use any number of values in a ``{% cycle %}`` tag, separated by spaces.
+Values enclosed in single (``'``) or double quotes (``"``) are treated as
+string literals, while values without quotes are treated as template variables.
+
+Note that the variables included in the cycle will not be escaped.
+This is because template tags do not escape their content. Any HTML or
+Javascript code contained in the printed variable will be rendered
+as-is, which could potentially lead to security issues.
+
+For backwards compatibility, the ``{% cycle %}`` tag supports the much inferior
+old syntax from previous Django versions. You shouldn't use this in any new
+projects, but for the sake of the people who are still using it, here's what it
+looks like::
+
+    {% cycle row1,row2,row3 %}
+
+In this syntax, each value gets interpreted as a literal string, and there's no
+way to specify variable values. Or literal commas. Or spaces. Did we mention
+you shouldn't use this syntax in any new projects?
+
+.. versionadded:: 1.3
 
 By default, when you use the ``as`` keyword with the cycle tag, the
-usage of ``{% cycle %}`` that initiates the cycle will itself produce
+usage of ``{% cycle %}`` that declares the cycle will itself output
 the first value in the cycle. This could be a problem if you want to
-use the value in a nested loop or an included template. If you only want
-to declare the cycle but not produce the first value, you can add a
+use the value in a nested loop or an included template. If you want to
+just declare the cycle, but not output the first value, you can add a
 ``silent`` keyword as the last keyword in the tag. For example::
 
     {% for obj in some_list %}
         {% cycle 'row1' 'row2' as rowcolors silent %}
-        <tr class="{{ rowcolors }}">{% include "subtemplate.html" %}</tr>
+        <tr class="{{ rowcolors }}">{% include "subtemplate.html " %}</tr>
     {% endfor %}
 
 This will output a list of ``<tr>`` elements with ``class``
-alternating between ``row1`` and ``row2``. The subtemplate will have
-access to ``rowcolors`` in its context and the value will match the class
-of the ``<tr>`` that encloses it. If the ``silent`` keyword were to be
-omitted, ``row1`` and ``row2`` would be emitted as normal text, outside the
+alternating between ``row1`` and ``row2``; the subtemplate will have
+access to ``rowcolors`` in it's context that matches the class of the
+``<tr>`` that encloses it. If the ``silent`` keyword were to be
+omitted, ``row1`` would be emitted as normal text, outside the
 ``<tr>`` element.
 
 When the silent keyword is used on a cycle definition, the silence
-automatically applies to all subsequent uses of that specific cycle tag.
-The following template would output *nothing*, even though the second
-call to ``{% cycle %}`` doesn't specify ``silent``::
+automatically applies to all subsequent uses of the cycle tag. In,
+the following template would output *nothing*, even though the second
+call to ``{% cycle %}`` doesn't specify silent::
 
     {% cycle 'row1' 'row2' as rowcolors silent %}
     {% cycle rowcolors %}
 
-You can use the :ttag:`resetcycle` tag to make a ``{% cycle %}`` tag restart
-from its first value when it's next encountered.
-
 .. templatetag:: debug
 
-``debug``
----------
+debug
+^^^^^
 
 Outputs a whole load of debugging information, including the current context
 and imported modules.
 
 .. templatetag:: extends
 
-``extends``
------------
+extends
+^^^^^^^
 
 Signals that this template extends a parent template.
 
@@ -215,37 +214,15 @@ This tag can be used in two ways:
 
 See :ref:`template-inheritance` for more information.
 
-A string argument may be a relative path starting with ``./`` or ``../``. For
-example, assume the following directory structure::
-
-    dir1/
-        template.html
-        base2.html
-        my/
-            base3.html
-    base1.html
-
-In ``template.html``, the following paths would be valid::
-
-    {% extends "./base2.html" %}
-    {% extends "../base1.html" %}
-    {% extends "./my/base3.html" %}
-
-.. versionadded:: 1.10
-
-   The ability to use relative paths was added.
-
 .. templatetag:: filter
 
-``filter``
-----------
+filter
+^^^^^^
 
-Filters the contents of the block through one or more filters. Multiple
-filters can be specified with pipes and filters can have arguments, just as
-in variable syntax.
+Filters the contents of the variable through variable filters.
 
-Note that the block includes *all* the text between the ``filter`` and
-``endfilter`` tags.
+Filters can also be piped through each other, and they can have arguments --
+just like in variable syntax.
 
 Sample usage::
 
@@ -261,11 +238,13 @@ Sample usage::
 
 .. templatetag:: firstof
 
-``firstof``
------------
+firstof
+^^^^^^^
 
-Outputs the first argument variable that is not ``False``. Outputs nothing if
-all the passed variables are ``False``.
+Outputs the first variable passed that is not False. Does NOT auto-escape
+variable values.
+
+Outputs nothing if all the passed variables are False.
 
 Sample usage::
 
@@ -274,39 +253,36 @@ Sample usage::
 This is equivalent to::
 
     {% if var1 %}
-        {{ var1 }}
-    {% elif var2 %}
-        {{ var2 }}
-    {% elif var3 %}
-        {{ var3 }}
-    {% endif %}
+        {{ var1|safe }}
+    {% else %}{% if var2 %}
+        {{ var2|safe }}
+    {% else %}{% if var3 %}
+        {{ var3|safe }}
+    {% endif %}{% endif %}{% endif %}
 
 You can also use a literal string as a fallback value in case all
 passed variables are False::
 
     {% firstof var1 var2 var3 "fallback value" %}
 
-This tag auto-escapes variable values. You can disable auto-escaping with::
+Note that the variables included in the firstof tag will not be
+escaped. This is because template tags do not escape their content.
+Any HTML or Javascript code contained in the printed variable will be
+rendered as-is, which could potentially lead to security issues. If you
+need to escape the variables in the firstof tag, you must do so
+explicitly::
 
-    {% autoescape off %}
-        {% firstof var1 var2 var3 "<strong>fallback value</strong>" %}
-    {% endautoescape %}
-
-Or if only some variables should be escaped, you can use::
-
-    {% firstof var1 var2|safe var3 "<strong>fallback value</strong>"|safe %}
-
-You can use the syntax ``{% firstof var1 var2 var3 as value %}`` to store the
-output inside a variable.
+    {% filter force_escape %}
+        {% firstof var1 var2 var3 "fallback value" %}
+    {% endfilter %}
 
 .. templatetag:: for
 
-``for``
--------
+for
+^^^
 
-Loops over each item in an array, making the item available in a context
-variable. For example, to display a list of athletes provided in
-``athlete_list``::
+Loop over each item in an array.  For example, to display a list of athletes
+provided in ``athlete_list``::
 
     <ul>
     {% for athlete in athlete_list %}
@@ -318,7 +294,7 @@ You can loop over a list in reverse by using
 ``{% for obj in list reversed %}``.
 
 If you need to loop over a list of lists, you can unpack the values
-in each sublist into individual variables. For example, if your context
+in each sub-list into individual variables. For example, if your context
 contains a list of (x,y) coordinates called ``points``, you could use the
 following to output the list of points::
 
@@ -334,14 +310,6 @@ would display the keys and values of the dictionary::
         {{ key }}: {{ value }}
     {% endfor %}
 
-Keep in mind that for the dot operator, dictionary key lookup takes precedence
-over method lookup. Therefore if the ``data`` dictionary contains a key named
-``'items'``, ``data.items`` will return ``data['items']`` instead of
-``data.items()``. Avoid adding keys that are named like dictionary methods if
-you want to use those methods in a template (``items``, ``values``, ``keys``,
-etc.). Read more about the lookup order of the dot operator in the
-:ref:`documentation of template variables <template-variables>`.
-
 The for loop sets a number of variables available within the loop:
 
 ==========================  ===============================================
@@ -355,23 +323,23 @@ Variable                    Description
                             loop (0-indexed)
 ``forloop.first``           True if this is the first time through the loop
 ``forloop.last``            True if this is the last time through the loop
-``forloop.parentloop``      For nested loops, this is the loop surrounding
-                            the current one
+``forloop.parentloop``      For nested loops, this is the loop "above" the
+                            current one
 ==========================  ===============================================
 
-``for`` ... ``empty``
----------------------
+for ... empty
+^^^^^^^^^^^^^
 
-The ``for`` tag can take an optional ``{% empty %}`` clause whose text is
+The ``for`` tag can take an optional ``{% empty %}`` clause that will be
 displayed if the given array is empty or could not be found::
 
     <ul>
     {% for athlete in athlete_list %}
         <li>{{ athlete.name }}</li>
     {% empty %}
-        <li>Sorry, no athletes in this list.</li>
+        <li>Sorry, no athlete in this list!</li>
     {% endfor %}
-    </ul>
+    <ul>
 
 The above is equivalent to -- but shorter, cleaner, and possibly faster
 than -- the following::
@@ -388,8 +356,8 @@ than -- the following::
 
 .. templatetag:: if
 
-``if``
-------
+if
+^^
 
 The ``{% if %}`` tag evaluates a variable, and if that variable is "true" (i.e.
 exists, is not empty, and is not a false boolean value) the contents of the
@@ -406,12 +374,16 @@ block are output::
 In the above, if ``athlete_list`` is not empty, the number of athletes will be
 displayed by the ``{{ athlete_list|length }}`` variable.
 
-As you can see, the ``if`` tag may take one or several ``{% elif %}``
+As you can see, the ``if`` tag may take one or several `` {% elif %}``
 clauses, as well as an ``{% else %}`` clause that will be displayed if all
 previous conditions fail. These clauses are optional.
 
+.. versionadded:: 1.4
+
+The ``if`` tag now supports ``{% elif %}`` clauses.
+
 Boolean operators
-~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^
 
 :ttag:`if` tags may use ``and``, ``or`` or ``not`` to test a number of
 variables or to negate a given variable::
@@ -429,12 +401,16 @@ variables or to negate a given variable::
     {% endif %}
 
     {% if not athlete_list or coach_list %}
-        There are no athletes or there are some coaches.
+        There are no athletes or there are some coaches (OK, so
+        writing English translations of boolean logic sounds
+        stupid; it's not our fault).
     {% endif %}
 
     {% if athlete_list and not coach_list %}
         There are some athletes and absolutely no coaches.
     {% endif %}
+
+.. versionchanged:: 1.2
 
 Use of both ``and`` and ``or`` clauses within the same tag is allowed, with
 ``and`` having higher precedence than ``or`` e.g.::
@@ -447,12 +423,15 @@ will be interpreted like:
 
     if (athlete_list and coach_list) or cheerleader_list
 
-Use of actual parentheses in the :ttag:`if` tag is invalid syntax. If you need
+Use of actual brackets in the :ttag:`if` tag is invalid syntax.  If you need
 them to indicate precedence, you should use nested :ttag:`if` tags.
 
+.. versionadded:: 1.2
+
+
 :ttag:`if` tags may also use the operators ``==``, ``!=``, ``<``, ``>``,
-``<=``, ``>=``, ``in``, ``not in``, ``is``, and ``is not`` which work as
-follows:
+``<=``, ``>=`` and ``in`` which work as follows:
+
 
 ``==`` operator
 ^^^^^^^^^^^^^^^
@@ -513,7 +492,7 @@ Greater than or equal to. Example::
 ^^^^^^^^^^^^^^^
 
 Contained within. This operator is supported by many Python containers to test
-whether the given value is in the container. The following are some examples
+whether the given value is in the container.  The following are some examples
 of how ``x in y`` will be interpreted::
 
     {% if "bc" in "abcdef" %}
@@ -533,42 +512,21 @@ of how ``x in y`` will be interpreted::
 ``not in`` operator
 ^^^^^^^^^^^^^^^^^^^
 
-Not contained within. This is the negation of the ``in`` operator.
+Not contained within.  This is the negation of the ``in`` operator.
 
-``is`` operator
-^^^^^^^^^^^^^^^
 
-.. versionadded:: 1.10
+The comparison operators cannot be 'chained' like in Python or in mathematical
+notation. For example, instead of using::
 
-Object identity. Tests if two values are the same object. Example::
+    {% if a > b > c %}  (WRONG)
 
-    {% if somevar is True %}
-      This appears if and only if somevar is True.
-    {% endif %}
+you should use::
 
-    {% if somevar is None %}
-      This appears if somevar is None, or if somevar is not found in the context.
-    {% endif %}
+    {% if a > b and b > c %}
 
-``is not`` operator
-^^^^^^^^^^^^^^^^^^^
-
-.. versionadded:: 1.10
-
-Negated object identity. Tests if two values are not the same object. This is
-the negation of the ``is`` operator. Example::
-
-    {% if somevar is not True %}
-      This appears if somevar is not True, or if somevar is not found in the
-      context.
-    {% endif %}
-
-    {% if somevar is not None %}
-      This appears if and only if somevar is not None.
-    {% endif %}
 
 Filters
-~~~~~~~
+^^^^^^^
 
 You can also use filters in the :ttag:`if` expression. For example::
 
@@ -577,11 +535,11 @@ You can also use filters in the :ttag:`if` expression. For example::
     {% endif %}
 
 Complex expressions
-~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^
 
 All of the above can be combined to form complex expressions. For such
 expressions, it can be important to know how the operators are grouped when the
-expression is evaluated - that is, the precedence rules. The precedence of the
+expression is evaluated - that is, the precedence rules.  The precedence of the
 operators, from lowest to highest, is as follows:
 
 * ``or``
@@ -591,7 +549,9 @@ operators, from lowest to highest, is as follows:
 * ``==``, ``!=``, ``<``, ``>``, ``<=``, ``>=``
 
 (This follows Python exactly). So, for example, the following complex
-:ttag:`if` tag::
+:ttag:`if` tag:
+
+.. code-block:: django
 
     {% if a == b or c == d and e %}
 
@@ -605,27 +565,11 @@ If you need different precedence, you will need to use nested :ttag:`if` tags.
 Sometimes that is better for clarity anyway, for the sake of those who do not
 know the precedence rules.
 
-The comparison operators cannot be 'chained' like in Python or in mathematical
-notation. For example, instead of using::
-
-    {% if a > b > c %}  (WRONG)
-
-you should use::
-
-    {% if a > b and b > c %}
-
-``ifequal`` and ``ifnotequal``
-------------------------------
-
-``{% ifequal a b %} ... {% endifequal %}`` is an obsolete way to write
-``{% if a == b %} ... {% endif %}``. Likewise, ``{% ifnotequal a b %} ...
-{% endifnotequal %}`` is superseded by ``{% if a != b %} ... {% endif %}``.
-The ``ifequal`` and ``ifnotequal`` tags will be deprecated in a future release.
 
 .. templatetag:: ifchanged
 
-``ifchanged``
--------------
+ifchanged
+^^^^^^^^^
 
 Check if a value has changed from the last iteration of a loop.
 
@@ -662,15 +606,57 @@ will be displayed if the value has not changed::
                 {% ifchanged match.ballot_id %}
                     {% cycle "red" "blue" %}
                 {% else %}
-                    gray
+                    grey
                 {% endifchanged %}
             ">{{ match }}</div>
         {% endfor %}
 
+.. templatetag:: ifequal
+
+ifequal
+^^^^^^^
+
+Output the contents of the block if the two arguments equal each other.
+
+Example::
+
+    {% ifequal user.id comment.user_id %}
+        ...
+    {% endifequal %}
+
+As in the :ttag:`if` tag, an ``{% else %}`` clause is optional.
+
+The arguments can be hard-coded strings, so the following is valid::
+
+    {% ifequal user.username "adrian" %}
+        ...
+    {% endifequal %}
+
+It is only possible to compare an argument to template variables or strings.
+You cannot check for equality with Python objects such as ``True`` or
+``False``.  If you need to test if something is true or false, use the
+:ttag:`if` tag instead.
+
+.. versionadded:: 1.2
+   An alternative to the ``ifequal`` tag is to use the :ttag:`if` tag and the
+   ``==`` operator.
+
+.. templatetag:: ifnotequal
+
+ifnotequal
+^^^^^^^^^^
+
+Just like :ttag:`ifequal`, except it tests that the two arguments are not
+equal.
+
+.. versionadded:: 1.2
+   An alternative to the ``ifnotequal`` tag is to use the :ttag:`if` tag and
+   the ``!=`` operator.
+
 .. templatetag:: include
 
-``include``
------------
+include
+^^^^^^^
 
 Loads a template and renders it with the current context. This is a way of
 "including" other templates within a template.
@@ -682,27 +668,15 @@ This example includes the contents of the template ``"foo/bar.html"``::
 
     {% include "foo/bar.html" %}
 
-A string argument may be a relative path starting with ``./`` or ``../`` as
-described in the :ttag:`extends` tag.
-
-.. versionadded:: 1.10
-
-   The ability to use a relative path was added.
-
 This example includes the contents of the template whose name is contained in
 the variable ``template_name``::
 
     {% include template_name %}
 
-The variable may also be any object with a ``render()`` method that accepts a
-context. This allows you to reference a compiled ``Template`` in your context.
+An included template is rendered with the context of the template that's
+including it. This example produces the output ``"Hello, John"``:
 
-An included template is rendered within the context of the template that
-includes it. This example produces the output ``"Hello, John!"``:
-
-* Context: variable ``person`` is set to ``"John"`` and variable ``greeting``
-  is set to ``"Hello"``.
-
+* Context: variable ``person`` is set to ``"john"``.
 * Template::
 
     {% include "name_snippet.html" %}
@@ -711,30 +685,17 @@ includes it. This example produces the output ``"Hello, John!"``:
 
     {{ greeting }}, {{ person|default:"friend" }}!
 
+.. versionchanged:: 1.3
+   Additional context and exclusive context.
+
 You can pass additional context to the template using keyword arguments::
 
     {% include "name_snippet.html" with person="Jane" greeting="Hello" %}
 
-If you want to render the context only with the variables provided (or even
-no variables at all), use the ``only`` option. No other variables are
-available to the included template::
+If you want to only render the context with the variables provided (or even
+no variables at all), use the ``only`` option::
 
     {% include "name_snippet.html" with greeting="Hi" only %}
-
-If the included template causes an exception while it's rendered (including
-if it's missing or has syntax errors), the behavior varies depending on the
-:class:`template engine's <django.template.Engine>` ``debug`` option (if not
-set, this option defaults to the value of :setting:`DEBUG`). When debug mode is
-turned on, an exception like :exc:`~django.template.TemplateDoesNotExist` or
-:exc:`~django.template.TemplateSyntaxError` will be raised. When debug mode
-is turned off, ``{% include %}`` logs a warning to the ``django.template``
-logger with the exception that happens while rendering the included template
-and returns an empty string.
-
-.. deprecated:: 1.11
-
-    Silencing exceptions raised while rendering the ``{% include %}`` template
-    tag is deprecated. In Django 2.1, the exception will be raised.
 
 .. note::
     The :ttag:`include` tag should be considered as an implementation of
@@ -743,15 +704,12 @@ and returns an empty string.
     This means that there is no shared state between included templates --
     each include is a completely independent rendering process.
 
-    Blocks are evaluated *before* they are included. This means that a template
-    that includes blocks from another will contain blocks that have *already
-    been evaluated and rendered* - not blocks that can be overridden by, for
-    example, an extending template.
+See also: :ttag:`{% ssi %}<ssi>`.
 
 .. templatetag:: load
 
-``load``
---------
+load
+^^^^
 
 Loads a custom template tag set.
 
@@ -760,6 +718,8 @@ registered in ``somelibrary`` and ``otherlibrary`` located in package
 ``package``::
 
     {% load somelibrary package.otherlibrary %}
+
+.. versionchanged:: 1.3
 
 You can also selectively load individual filters or tags from a library, using
 the ``from`` argument. In this example, the template tags/filters named ``foo``
@@ -770,44 +730,10 @@ and ``bar`` will be loaded from ``somelibrary``::
 See :doc:`Custom tag and filter libraries </howto/custom-template-tags>` for
 more information.
 
-.. templatetag:: lorem
-
-``lorem``
----------
-
-Displays random "lorem ipsum" Latin text. This is useful for providing sample
-data in templates.
-
-Usage::
-
-    {% lorem [count] [method] [random] %}
-
-The ``{% lorem %}`` tag can be used with zero, one, two or three arguments.
-The arguments are:
-
-===========  =============================================================
-Argument     Description
-===========  =============================================================
-``count``    A number (or variable) containing the number of paragraphs or
-             words to generate (default is 1).
-``method``   Either ``w`` for words, ``p`` for HTML paragraphs or ``b``
-             for plain-text paragraph blocks (default is ``b``).
-``random``   The word ``random``, which if given, does not use the common
-             paragraph ("Lorem ipsum dolor sit amet...") when generating
-             text.
-===========  =============================================================
-
-Examples:
-
-* ``{% lorem %}`` will output the common "lorem ipsum" paragraph.
-* ``{% lorem 3 p %}`` will output the common "lorem ipsum" paragraph
-  and two random paragraphs each wrapped in HTML ``<p>`` tags.
-* ``{% lorem 2 w random %}`` will output two random Latin words.
-
 .. templatetag:: now
 
-``now``
--------
+now
+^^^
 
 Displays the current date and/or time, using a format according to the given
 string. Such string can contain format specifiers characters as described
@@ -826,33 +752,26 @@ respectively::
 
 This would display as "It is the 4th of September".
 
+.. versionchanged:: 1.4
+
 .. note::
 
     The format passed can also be one of the predefined ones
     :setting:`DATE_FORMAT`, :setting:`DATETIME_FORMAT`,
     :setting:`SHORT_DATE_FORMAT` or :setting:`SHORT_DATETIME_FORMAT`.
     The predefined formats may vary depending on the current locale and
-    if :doc:`/topics/i18n/formatting` is enabled, e.g.::
+    if :ref:`format-localization` is enabled, e.g.::
 
         It is {% now "SHORT_DATETIME_FORMAT" %}
 
-You can also use the syntax ``{% now "Y" as current_year %}`` to store the
-output (as a string) inside a variable. This is useful if you want to use
-``{% now %}`` inside a template tag like :ttag:`blocktrans` for example::
-
-    {% now "Y" as current_year %}
-    {% blocktrans %}Copyright {{ current_year }}{% endblocktrans %}
-
 .. templatetag:: regroup
 
-``regroup``
------------
+regroup
+^^^^^^^
 
 Regroups a list of alike objects by a common attribute.
 
-This complex tag is best illustrated by way of an example: say that ``cities``
-is a list of cities represented by dictionaries containing ``"name"``,
-``"population"``, and ``"country"`` keys:
+This complex tag is best illustrated by way of an example: say that "places" is a list of cities represented by dictionaries containing ``"name"``, ``"population"``, and ``"country"`` keys:
 
 .. code-block:: python
 
@@ -864,22 +783,17 @@ is a list of cities represented by dictionaries containing ``"name"``,
         {'name': 'Tokyo', 'population': '33,000,000', 'country': 'Japan'},
     ]
 
-...and you'd like to display a hierarchical list that is ordered by country,
-like this:
+...and you'd like to display a hierarchical list that is ordered by country, like this:
 
 * India
-
-  * Mumbai: 19,000,000
-  * Calcutta: 15,000,000
-
+    * Mumbai: 19,000,000
+    * Calcutta: 15,000,000
 * USA
-
-  * New York: 20,000,000
-  * Chicago: 7,000,000
-
+    * New York: 20,000,000
+    * Chicago: 7,000,000
 * Japan
+    * Tokyo: 33,000,000
 
-  * Tokyo: 33,000,000
 
 You can use the ``{% regroup %}`` tag to group the list of cities by country.
 The following snippet of template code would accomplish this::
@@ -890,8 +804,8 @@ The following snippet of template code would accomplish this::
     {% for country in country_list %}
         <li>{{ country.grouper }}
         <ul>
-            {% for city in country.list %}
-              <li>{{ city.name }}: {{ city.population }}</li>
+            {% for item in country.list %}
+              <li>{{ item.name }}: {{ item.population }}</li>
             {% endfor %}
         </ul>
         </li>
@@ -904,35 +818,12 @@ resulting list. Here, we're regrouping the ``cities`` list by the ``country``
 attribute and calling the result ``country_list``.
 
 ``{% regroup %}`` produces a list (in this case, ``country_list``) of
-**group objects**. Group objects are instances of
-:py:func:`~collections.namedtuple` with two fields:
+**group objects**. Each group object has two attributes:
 
 * ``grouper`` -- the item that was grouped by (e.g., the string "India" or
   "Japan").
 * ``list`` -- a list of all items in this group (e.g., a list of all cities
   with country='India').
-
-.. versionchanged:: 1.11
-
-    The group object was changed from a dictionary to a
-    :py:func:`~collections.namedtuple`.
-
-Because ``{% regroup %}`` produces :py:func:`~collections.namedtuple` objects,
-you can also write the previous example as::
-
-    {% regroup cities by country as country_list %}
-
-    <ul>
-    {% for country, local_cities in country_list %}
-        <li>{{ country }}
-        <ul>
-            {% for city in local_cities %}
-              <li>{{ city.name }}: {{ city.population }}</li>
-            {% endfor %}
-        </ul>
-        </li>
-    {% endfor %}
-    </ul>
 
 Note that ``{% regroup %}`` does not order its input! Our example relies on
 the fact that the ``cities`` list was ordered by ``country`` in the first place.
@@ -955,24 +846,15 @@ With this input for ``cities``, the example ``{% regroup %}`` template code
 above would result in the following output:
 
 * India
-
-  * Mumbai: 19,000,000
-
+    * Mumbai: 19,000,000
 * USA
-
-  * New York: 20,000,000
-
+    * New York: 20,000,000
 * India
-
-  * Calcutta: 15,000,000
-
+    * Calcutta: 15,000,000
 * USA
-
-  * Chicago: 7,000,000
-
+    * Chicago: 7,000,000
 * Japan
-
-  * Tokyo: 33,000,000
+    * Tokyo: 33,000,000
 
 The easiest solution to this gotcha is to make sure in your view code that the
 data is ordered according to how you want to display it.
@@ -983,7 +865,7 @@ Another solution is to sort the data in the template using the
     {% regroup cities|dictsort:"country" by country as country_list %}
 
 Grouping on other properties
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Any valid template lookup is a legal grouping attribute for the regroup
 tag, including methods, attributes, dictionary keys and list items. For
@@ -993,7 +875,7 @@ an attribute "description," you could use::
     {% regroup cities by country.description as country_list %}
 
 Or, if ``country`` is a field with ``choices``, it will have a
-:meth:`~django.db.models.Model.get_FOO_display` method available as an
+:meth:`^django.db.models.Model.get_FOO_display` method available as an
 attribute, allowing  you to group on the display string rather than the
 ``choices`` key::
 
@@ -1002,61 +884,10 @@ attribute, allowing  you to group on the display string rather than the
 ``{{ country.grouper }}`` will now display the value fields from the
 ``choices`` set rather than the keys.
 
-.. templatetag:: resetcycle
-
-``resetcycle``
---------------
-
-.. versionadded:: 1.11
-
-Resets a previous `cycle`_ so that it restarts from its first item at its next
-encounter. Without arguments, ``{% resetcycle %}`` will reset the last
-``{% cycle %}`` defined in the template.
-
-Example usage::
-
-    {% for coach in coach_list %}
-        <h1>{{ coach.name }}</h1>
-        {% for athlete in coach.athlete_set.all %}
-            <p class="{% cycle 'odd' 'even' %}">{{ athlete.name }}</p>
-        {% endfor %}
-        {% resetcycle %}
-    {% endfor %}
-
-This example would return this HTML::
-
-    <h1>José Mourinho</h1>
-    <p class="odd">Thibaut Courtois</p>
-    <p class="even">John Terry</p>
-    <p class="odd">Eden Hazard</p>
-
-    <h1>Carlo Ancelotti</h1>
-    <p class="odd">Manuel Neuer</p>
-    <p class="even">Thomas Müller</p>
-
-Notice how the first block ends with ``class="odd"`` and the new one starts
-with ``class="odd"``. Without the ``{% resetcycle %}`` tag, the second block
-would start with ``class="even"``.
-
-You can also reset named cycle tags::
-
-    {% for item in list %}
-        <p class="{% cycle 'odd' 'even' as stripe %} {% cycle 'major' 'minor' 'minor' 'minor' 'minor' as tick %}">
-            {{ item.data }}
-        </p>
-        {% ifchanged item.category %}
-            <h1>{{ item.category }}</h1>
-            {% if not forloop.first %}{% resetcycle tick %}{% endif %}
-        {% endifchanged %}
-    {% endfor %}
-
-In this example, we have both the alternating odd/even rows and a "major" row
-every fifth row. Only the five-row cycle is reset when a category changes.
-
 .. templatetag:: spaceless
 
-``spaceless``
--------------
+spaceless
+^^^^^^^^^
 
 Removes whitespace between HTML tags. This includes tab
 characters and newlines.
@@ -1082,10 +913,58 @@ this example, the space around ``Hello`` won't be stripped::
         </strong>
     {% endspaceless %}
 
+.. templatetag:: ssi
+
+ssi
+^^^
+
+Outputs the contents of a given file into the page.
+
+Like a simple :ttag:`include` tag, ``{% ssi %}`` includes the contents of
+another file -- which must be specified using an absolute path -- in the
+current page::
+
+    {% ssi /home/html/ljworld.com/includes/right_generic.html %}
+
+If the optional "parsed" parameter is given, the contents of the included
+file are evaluated as template code, within the current context::
+
+    {% ssi /home/html/ljworld.com/includes/right_generic.html parsed %}
+
+Note that if you use ``{% ssi %}``, you'll need to define
+:setting:`ALLOWED_INCLUDE_ROOTS` in your Django settings, as a security
+measure.
+
+See also: :ttag:`{% include %}<include>`.
+
+.. admonition:: Forwards compatibility
+
+    .. versionchanged:: 1.3
+
+    In Django 1.5, the behavior of the :ttag:`ssi` template tag will
+    change, with the first argument being made into a context
+    variable, rather than being a special case unquoted constant. This
+    will allow the :ttag:`ssi` tag to use a context variable as the
+    value of the page to be included.
+
+    In order to provide a forwards compatibility path, Django 1.3
+    provides a future compatibility library -- ``future`` -- that
+    implements the new behavior. To use this library, add a
+    :ttag:`load` call at the top of any template using the :ttag:`ssi`
+    tag, and wrap the first argument to the :ttag:`ssi` tag in quotes.
+    For example::
+
+        {% load ssi from future %}
+        {% ssi '/home/html/ljworld.com/includes/right_generic.html' %}
+
+    In Django 1.5, the unquoted constant behavior will be replaced
+    with the behavior provided by the ``future`` tag library.
+    Existing templates should be migrated to use the new syntax.
+
 .. templatetag:: templatetag
 
-``templatetag``
----------------
+templatetag
+^^^^^^^^^^^
 
 Outputs one of the syntax characters used to compose template tags.
 
@@ -1107,31 +986,25 @@ Argument            Outputs
 ``closecomment``    ``#}``
 ==================  =======
 
-Sample usage::
-
-    {% templatetag openblock %} url 'entry_list' {% templatetag closeblock %}
-
 .. templatetag:: url
 
-``url``
--------
+url
+^^^
 
 Returns an absolute path reference (a URL without the domain name) matching a
-given view and optional parameters. Any special characters in the resulting
-path will be encoded using :func:`~django.utils.encoding.iri_to_uri`.
+given view function and optional parameters. This is a way to output links
+without violating the DRY principle by having to hard-code URLs in your
+templates::
 
-This is a way to output links without violating the DRY principle by having to
-hard-code URLs in your templates::
+    {% url path.to.some_view v1 v2 %}
 
-    {% url 'some-url-name' v1 v2 %}
-
-The first argument is a :func:`~django.conf.urls.url` ``name``. It can be a
-quoted literal or any other context variable. Additional arguments are optional
-and should be space-separated values that will be used as arguments in the URL.
+The first argument is a path to a view function in the format
+``package.package.module.function``. Additional arguments are optional and
+should be space-separated values that will be used as arguments in the URL.
 The example above shows passing positional arguments. Alternatively you may
 use keyword syntax::
 
-    {% url 'some-url-name' arg1=v1 arg2=v2 %}
+    {% url path.to.some_view arg1=v1 arg2=v2 %}
 
 Do not mix both positional and keyword syntax in a single call. All arguments
 required by the URLconf should be present.
@@ -1142,7 +1015,7 @@ takes a client ID (here, ``client()`` is a method inside the views file
 
 .. code-block:: python
 
-    ('^client/([0-9]+)/$', app_views.client, name='app-views-client')
+    ('^client/(\d+)/$', 'app_views.client')
 
 If this app's URLconf is included into the project's URLconf under a path
 such as this:
@@ -1153,93 +1026,118 @@ such as this:
 
 ...then, in a template, you can create a link to this view like this::
 
-    {% url 'app-views-client' client.id %}
+    {% url app_views.client client.id %}
 
 The template tag will output the string ``/clients/client/123/``.
 
+If you're using :ref:`named URL patterns <naming-url-patterns>`, you can
+refer to the name of the pattern in the ``url`` tag instead of using the
+path to the view.
+
 Note that if the URL you're reversing doesn't exist, you'll get an
-:exc:`~django.urls.NoReverseMatch` exception raised, which will cause your
-site to display an error page.
+:exc:`^django.core.urlresolvers.NoReverseMatch` exception raised, which will
+cause your site to display an error page.
 
 If you'd like to retrieve a URL without displaying it, you can use a slightly
 different call::
 
-    {% url 'some-url-name' arg arg2 as the_url %}
+
+    {% url path.to.view arg arg2 as the_url %}
 
     <a href="{{ the_url }}">I'm linking to {{ the_url }}</a>
-
-The scope of the variable created by the  ``as var`` syntax is the
-``{% block %}`` in which the ``{% url %}`` tag appears.
 
 This ``{% url ... as var %}`` syntax will *not* cause an error if the view is
 missing. In practice you'll use this to link to views that are optional::
 
-    {% url 'some-url-name' as the_url %}
+    {% url path.to.view as the_url %}
     {% if the_url %}
       <a href="{{ the_url }}">Link to optional stuff</a>
     {% endif %}
 
 If you'd like to retrieve a namespaced URL, specify the fully qualified name::
 
-    {% url 'myapp:view-name' %}
+    {% url myapp:view-name %}
 
 This will follow the normal :ref:`namespaced URL resolution strategy
 <topics-http-reversing-url-namespaces>`, including using any hints provided
 by the context as to the current application.
 
-.. warning::
+.. versionchanged:: 1.2
 
-    Don't forget to put quotes around the :func:`~django.conf.urls.url`
-    ``name``, otherwise the value will be interpreted as a context variable!
+For backwards compatibility, the ``{% url %}`` tag also supports the
+use of commas to separate arguments. You shouldn't use this in any new
+projects, but for the sake of the people who are still using it,
+here's what it looks like::
 
-.. templatetag:: verbatim
+    {% url path.to.view arg,arg2 %}
+    {% url path.to.view arg, arg2 %}
 
-``verbatim``
-------------
+This syntax doesn't support the use of literal commas, or equals
+signs. Did we mention you shouldn't use this syntax in any new
+projects?
 
-Stops the template engine from rendering the contents of this block tag.
+.. admonition:: Forwards compatibility
 
-A common use is to allow a JavaScript template layer that collides with
-Django's syntax. For example::
+    .. versionchanged:: 1.3
 
-    {% verbatim %}
-        {{if dying}}Still alive.{{/if}}
-    {% endverbatim %}
+    In Django 1.5, the behavior of the :ttag:`url` template tag will
+    change, with the first argument being made into a context
+    variable, rather than being a special case unquoted constant. This
+    will allow the :ttag:`url` tag to use a context variable as the
+    value of the URL name to be reversed.
 
-You can also designate a specific closing tag, allowing the use of
-``{% endverbatim %}`` as part of the unrendered contents::
+    In order to provide a forwards compatibility path, Django 1.3
+    provides a future compatibility library -- ``future`` -- that
+    implements the new behavior. To use this library, add a
+    :ttag:`load` call at the top of any template using the :ttag:`url`
+    tag, and wrap the first argument to the :ttag:`url` tag in quotes.
+    For example::
 
-    {% verbatim myblock %}
-        Avoid template rendering via the {% verbatim %}{% endverbatim %} block.
-    {% endverbatim myblock %}
+        {% load url from future %}
+
+
+        {% url 'app_views.client' %}
+
+        {% url 'myapp:view-name' %}
+
+        {% with view_path="app_views.client" %}
+        {% url view_path client.id %}
+        {% endwith %}
+
+        {% with url_name="client-detail-view" %}
+        {% url url_name client.id %}
+        {% endwith %}
+
+    The new library also drops support for the comma syntax for
+    separating arguments to the :ttag:`url` template tag.
+
+    In Django 1.5, the old behavior will be replaced with the behavior
+    provided by the ``future`` tag library. Existing templates be
+    migrated to use the new syntax.
 
 .. templatetag:: widthratio
 
-``widthratio``
---------------
+widthratio
+^^^^^^^^^^
 
 For creating bar charts and such, this tag calculates the ratio of a given
 value to a maximum value, and then applies that ratio to a constant.
 
 For example::
 
-    <img src="bar.png" alt="Bar"
-         height="10" width="{% widthratio this_value max_value max_width %}" />
+    <img src="bar.gif" height="10" width="{% widthratio this_value max_value 100 %}" />
 
-If ``this_value`` is 175, ``max_value`` is 200, and ``max_width`` is 100, the
-image in the above example will be 88 pixels wide
-(because 175/200 = .875; .875 * 100 = 87.5 which is rounded up to 88).
-
-In some cases you might want to capture the result of ``widthratio`` in a
-variable. It can be useful, for instance, in a :ttag:`blocktrans` like this::
-
-    {% widthratio this_value max_value max_width as width %}
-    {% blocktrans %}The width is: {{ width }}{% endblocktrans %}
+Above, if ``this_value`` is 175 and ``max_value`` is 200, the image in the
+above example will be 88 pixels wide (because 175/200 = .875; .875 * 100 = 87.5
+which is rounded up to 88).
 
 .. templatetag:: with
 
-``with``
---------
+with
+^^^^
+
+.. versionchanged:: 1.3
+   New keyword argument format and multiple variable assignments.
 
 Caches a complex variable under a simpler name. This is useful when accessing
 an "expensive" method (e.g., one that hits the database) multiple times.
@@ -1265,12 +1163,12 @@ You can assign more than one context variable::
 .. _ref-templates-builtins-filters:
 
 Built-in filter reference
-=========================
+-------------------------
 
 .. templatefilter:: add
 
-``add``
--------
+add
+^^^
 
 Adds the argument to the value.
 
@@ -1279,6 +1177,9 @@ For example::
     {{ value|add:"2" }}
 
 If ``value`` is ``4``, then the output will be ``6``.
+
+.. versionchanged:: 1.2
+   The following behavior didn't exist in previous Django versions.
 
 This filter will first try to coerce both values to integers. If this fails,
 it'll attempt to add the values together anyway. This will work on some data
@@ -1299,8 +1200,8 @@ output will be ``[1, 2, 3, 4, 5, 6]``.
 
 .. templatefilter:: addslashes
 
-``addslashes``
---------------
+addslashes
+^^^^^^^^^^
 
 Adds slashes before quotes. Useful for escaping strings in CSV, for example.
 
@@ -1313,11 +1214,10 @@ If ``value`` is ``"I'm using Django"``, the output will be
 
 .. templatefilter:: capfirst
 
-``capfirst``
-------------
+capfirst
+^^^^^^^^
 
-Capitalizes the first character of the value. If the first character is not
-a letter, this filter has no effect.
+Capitalizes the first character of the value.
 
 For example::
 
@@ -1327,8 +1227,8 @@ If ``value`` is ``"django"``, the output will be ``"Django"``.
 
 .. templatefilter:: center
 
-``center``
-----------
+center
+^^^^^^
 
 Centers the value in a field of a given width.
 
@@ -1340,33 +1240,27 @@ If ``value`` is ``"Django"``, the output will be ``"     Django    "``.
 
 .. templatefilter:: cut
 
-``cut``
--------
+cut
+^^^
 
 Removes all values of arg from the given string.
 
 For example::
 
-    {{ value|cut:" " }}
+    {{ value|cut:" "}}
 
 If ``value`` is ``"String with spaces"``, the output will be
 ``"Stringwithspaces"``.
 
 .. templatefilter:: date
 
-``date``
---------
+date
+^^^^
 
 Formats a date according to the given format.
 
-Uses a similar format as PHP's ``date()`` function (https://php.net/date)
+Uses a similar format as PHP's ``date()`` function (http://php.net/date)
 with some differences.
-
-.. note::
-    These format characters are not used in Django outside of templates. They
-    were designed to be compatible with PHP to ease transitioning for designers.
-
-.. _date-and-time-formatting-specifiers:
 
 Available format strings:
 
@@ -1405,8 +1299,7 @@ G                 Hour, 24-hour format without leading      ``'0'`` to ``'23'``
 h                 Hour, 12-hour format.                     ``'01'`` to ``'12'``
 H                 Hour, 24-hour format.                     ``'00'`` to ``'23'``
 i                 Minutes.                                  ``'00'`` to ``'59'``
-I                 Daylight Savings Time, whether it's       ``'1'`` or ``'0'``
-                  in effect or not.
+I                 Not implemented.
 j                 Day of the month without leading          ``'1'`` to ``'31'``
                   zeros.
 l                 Day of the week, textual, long.           ``'Friday'``
@@ -1417,22 +1310,21 @@ n                 Month without leading zeros.              ``'1'`` to ``'12'``
 N                 Month abbreviation in Associated Press    ``'Jan.'``, ``'Feb.'``, ``'March'``, ``'May'``
                   style. Proprietary extension.
 o                 ISO-8601 week-numbering year,             ``'1999'``
-                  corresponding to the ISO-8601 week
-                  number (W) which uses leap weeks. See Y
-                  for the more common year format.
+                  corresponding to
+                  the ISO-8601 week number (W)
 O                 Difference to Greenwich time in hours.    ``'+0200'``
 P                 Time, in 12-hour hours, minutes and       ``'1 a.m.'``, ``'1:30 p.m.'``, ``'midnight'``, ``'noon'``, ``'12:30 p.m.'``
                   'a.m.'/'p.m.', with minutes left off
                   if they're zero and the special-case
                   strings 'midnight' and 'noon' if
                   appropriate. Proprietary extension.
-r                 :rfc:`5322` formatted date.               ``'Thu, 21 Dec 2000 16:01:07 +0200'``
+r                 :rfc:`2822` formatted date.               ``'Thu, 21 Dec 2000 16:01:07 +0200'``
 s                 Seconds, 2 digits with leading zeros.     ``'00'`` to ``'59'``
 S                 English ordinal suffix for day of the     ``'st'``, ``'nd'``, ``'rd'`` or ``'th'``
                   month, 2 characters.
 t                 Number of days in the given month.        ``28`` to ``31``
 T                 Time zone of this machine.                ``'EST'``, ``'MDT'``
-u                 Microseconds.                             ``000000`` to ``999999``
+u                 Microseconds.                             ``0`` to ``999999``
 U                 Seconds since the Unix Epoch
                   (January 1 1970 00:00:00 UTC).
 w                 Day of the week, digits without           ``'0'`` (Sunday) to ``'6'`` (Saturday)
@@ -1448,11 +1340,19 @@ Z                 Time zone offset in seconds. The          ``-43200`` to ``4320
                   UTC is always positive.
 ================  ========================================  =====================
 
+.. versionadded:: 1.2
+
+The ``c`` and ``u`` format specification characters were added in Django 1.2.
+
+.. versionadded:: 1.4
+
+The ``e`` and ``o`` format specification characters were added in Django 1.4.
+
 For example::
 
     {{ value|date:"D d M Y" }}
 
-If ``value`` is a :py:class:`~datetime.datetime` object (e.g., the result of
+If ``value`` is a ``datetime`` object (e.g., the result of
 ``datetime.datetime.now()``), the output will be the string
 ``'Wed 09 Jan 2008'``.
 
@@ -1477,15 +1377,13 @@ When used without a format string::
 ...the formatting string defined in the :setting:`DATE_FORMAT` setting will be
 used, without applying any localization.
 
-You can combine ``date`` with the :tfilter:`time` filter to render a full
-representation of a ``datetime`` value. E.g.::
-
-    {{ value|date:"D d M Y" }} {{ value|time:"H:i" }}
+.. versionchanged:: 1.2
+    Predefined formats can now be influenced by the current locale.
 
 .. templatefilter:: default
 
-``default``
------------
+default
+^^^^^^^
 
 If value evaluates to ``False``, uses the given default. Otherwise, uses the
 value.
@@ -1498,8 +1396,8 @@ If ``value`` is ``""`` (the empty string), the output will be ``nothing``.
 
 .. templatefilter:: default_if_none
 
-``default_if_none``
--------------------
+default_if_none
+^^^^^^^^^^^^^^^
 
 If (and only if) value is ``None``, uses the given default. Otherwise, uses the
 value.
@@ -1515,8 +1413,8 @@ If ``value`` is ``None``, the output will be the string ``"nothing"``.
 
 .. templatefilter:: dictsort
 
-``dictsort``
-------------
+dictsort
+^^^^^^^^
 
 Takes a list of dictionaries and returns that list sorted by the key given in
 the argument.
@@ -1545,66 +1443,10 @@ then the output would be:
         {'name': 'zed', 'age': 19},
     ]
 
-You can also do more complicated things like::
-
-    {% for book in books|dictsort:"author.age" %}
-        * {{ book.title }} ({{ book.author.name }})
-    {% endfor %}
-
-If ``books`` is:
-
-.. code-block:: python
-
-    [
-        {'title': '1984', 'author': {'name': 'George', 'age': 45}},
-        {'title': 'Timequake', 'author': {'name': 'Kurt', 'age': 75}},
-        {'title': 'Alice', 'author': {'name': 'Lewis', 'age': 33}},
-    ]
-
-then the output would be::
-
-    * Alice (Lewis)
-    * 1984 (George)
-    * Timequake (Kurt)
-
-``dictsort`` can also order a list of lists (or any other object implementing
-``__getitem__()``) by elements at specified index. For example::
-
-    {{ value|dictsort:0 }}
-
-If ``value`` is:
-
-.. code-block:: python
-
-    [
-        ('a', '42'),
-        ('c', 'string'),
-        ('b', 'foo'),
-    ]
-
-then the output would be:
-
-.. code-block:: python
-
-    [
-        ('a', '42'),
-        ('b', 'foo'),
-        ('c', 'string'),
-    ]
-
-You must pass the index as an integer rather than a string. The following
-produce empty output::
-
-    {{ values|dictsort:"0" }}
-
-.. versionchanged:: 1.10
-
-    The ability to order a list of lists was added.
-
 .. templatefilter:: dictsortreversed
 
-``dictsortreversed``
---------------------
+dictsortreversed
+^^^^^^^^^^^^^^^^
 
 Takes a list of dictionaries and returns that list sorted in reverse order by
 the key given in the argument. This works exactly the same as the above filter,
@@ -1612,8 +1454,8 @@ but the returned value will be in reverse order.
 
 .. templatefilter:: divisibleby
 
-``divisibleby``
----------------
+divisibleby
+^^^^^^^^^^^
 
 Returns ``True`` if the value is divisible by the argument.
 
@@ -1625,8 +1467,8 @@ If ``value`` is ``21``, the output would be ``True``.
 
 .. templatefilter:: escape
 
-``escape``
-----------
+escape
+^^^^^^
 
 Escapes a string's HTML. Specifically, it makes these replacements:
 
@@ -1646,22 +1488,10 @@ applied to the result will only result in one round of escaping being done. So
 it is safe to use this function even in auto-escaping environments. If you want
 multiple escaping passes to be applied, use the :tfilter:`force_escape` filter.
 
-For example, you can apply ``escape`` to fields when :ttag:`autoescape` is off::
-
-    {% autoescape off %}
-        {{ title|escape }}
-    {% endautoescape %}
-
-.. deprecated:: 1.10
-
-    The "lazy" behavior of the ``escape`` filter is deprecated. It will change
-    to immediately apply :func:`~django.utils.html.conditional_escape` in
-    Django 2.0.
-
 .. templatefilter:: escapejs
 
-``escapejs``
-------------
+escapejs
+^^^^^^^^
 
 Escapes characters for use in JavaScript strings. This does *not* make the
 string safe for use in HTML, but does protect you from syntax errors when using
@@ -1676,11 +1506,11 @@ the output will be ``"testing\\u000D\\u000Ajavascript \\u0027string\\u0022 \\u00
 
 .. templatefilter:: filesizeformat
 
-``filesizeformat``
-------------------
+filesizeformat
+^^^^^^^^^^^^^^
 
 Formats the value like a 'human-readable' file size (i.e. ``'13 KB'``,
-``'4.1 MB'``, ``'102 bytes'``, etc.).
+``'4.1 MB'``, ``'102 bytes'``, etc).
 
 For example::
 
@@ -1688,18 +1518,10 @@ For example::
 
 If ``value`` is 123456789, the output would be ``117.7 MB``.
 
-.. admonition:: File sizes and SI units
-
-    Strictly speaking, ``filesizeformat`` does not conform to the International
-    System of Units which recommends using KiB, MiB, GiB, etc. when byte sizes
-    are calculated in powers of 1024 (which is the case here). Instead, Django
-    uses traditional unit names (KB, MB, GB, etc.) corresponding to names that
-    are more commonly used.
-
 .. templatefilter:: first
 
-``first``
----------
+first
+^^^^^
 
 Returns the first item in a list.
 
@@ -1709,10 +1531,36 @@ For example::
 
 If ``value`` is the list ``['a', 'b', 'c']``, the output will be ``'a'``.
 
+.. templatefilter:: fix_ampersands
+
+fix_ampersands
+^^^^^^^^^^^^^^
+
+.. note::
+
+    This is rarely useful as ampersands are automatically escaped. See
+    :tfilter:`escape` for more information.
+
+Replaces ampersands with ``&amp;`` entities.
+
+For example::
+
+    {{ value|fix_ampersands }}
+
+If ``value`` is ``Tom & Jerry``, the output will be ``Tom &amp; Jerry``.
+
+However, ampersands used in named entities and numeric character references
+will not be replaced. For example, if ``value`` is ``Caf&eacute;``, the output
+will *not* be ``Caf&amp;eacute;`` but remain ``Caf&eacute;``. This means that
+in some edge cases, such as acronyms followed by semicolons, this filter will
+not replace ampersands that need replacing. For example, if ``value`` is
+``Contact the R&D;``, the output will remain unchanged because ``&D;``
+resembles a named entity.
+
 .. templatefilter:: floatformat
 
-``floatformat``
----------------
+floatformat
+^^^^^^^^^^^
 
 When used without an argument, rounds a floating-point number to one decimal
 place -- but only if there's a decimal part to be displayed. For example:
@@ -1736,17 +1584,6 @@ that many decimal places. For example:
 ``34.26000``  ``{{ value|floatformat:3 }}``  ``34.260``
 ============  =============================  ==========
 
-Particularly useful is passing 0 (zero) as the argument which will round the
-float to the nearest integer.
-
-============  ================================  ==========
-``value``     Template                          Output
-============  ================================  ==========
-``34.23234``  ``{{ value|floatformat:"0" }}``   ``34``
-``34.00000``  ``{{ value|floatformat:"0" }}``   ``34``
-``39.56000``  ``{{ value|floatformat:"0" }}``   ``40``
-============  ================================  ==========
-
 If the argument passed to ``floatformat`` is negative, it will round a number
 to that many decimal places -- but only if there's a decimal part to be
 displayed. For example:
@@ -1764,8 +1601,8 @@ with an argument of ``-1``.
 
 .. templatefilter:: force_escape
 
-``force_escape``
-----------------
+force_escape
+^^^^^^^^^^^^
 
 Applies HTML escaping to a string (see the :tfilter:`escape` filter for
 details). This filter is applied *immediately* and returns a new, escaped
@@ -1773,17 +1610,10 @@ string. This is useful in the rare cases where you need multiple escaping or
 want to apply other filters to the escaped results. Normally, you want to use
 the :tfilter:`escape` filter.
 
-For example, if you want to catch the ``<p>`` HTML elements created by
-the :tfilter:`linebreaks` filter::
-
-    {% autoescape off %}
-        {{ body|linebreaks|force_escape }}
-    {% endautoescape %}
-
 .. templatefilter:: get_digit
 
-``get_digit``
--------------
+get_digit
+^^^^^^^^^
 
 Given a whole number, returns the requested digit, where 1 is the right-most
 digit, 2 is the second-right-most digit, etc. Returns the original value for
@@ -1798,8 +1628,8 @@ If ``value`` is ``123456789``, the output will be ``8``.
 
 .. templatefilter:: iriencode
 
-``iriencode``
--------------
+iriencode
+^^^^^^^^^
 
 Converts an IRI (Internationalized Resource Identifier) to a string that is
 suitable for including in a URL. This is necessary if you're trying to use
@@ -1816,8 +1646,8 @@ If ``value`` is ``"?test=1&me=2"``, the output will be ``"?test=1&amp;me=2"``.
 
 .. templatefilter:: join
 
-``join``
---------
+join
+^^^^
 
 Joins a list with a string, like Python's ``str.join(list)``
 
@@ -1830,8 +1660,8 @@ If ``value`` is the list ``['a', 'b', 'c']``, the output will be the string
 
 .. templatefilter:: last
 
-``last``
---------
+last
+^^^^
 
 Returns the last item in a list.
 
@@ -1844,8 +1674,8 @@ string ``"d"``.
 
 .. templatefilter:: length
 
-``length``
-----------
+length
+^^^^^^
 
 Returns the length of the value. This works for both strings and lists.
 
@@ -1853,15 +1683,12 @@ For example::
 
     {{ value|length }}
 
-If ``value`` is ``['a', 'b', 'c', 'd']`` or ``"abcd"``, the output will be
-``4``.
-
-The filter returns ``0`` for an undefined variable.
+If ``value`` is ``['a', 'b', 'c', 'd']``, the output will be ``4``.
 
 .. templatefilter:: length_is
 
-``length_is``
--------------
+length_is
+^^^^^^^^^
 
 Returns ``True`` if the value's length is the argument, or ``False`` otherwise.
 
@@ -1869,13 +1696,12 @@ For example::
 
     {{ value|length_is:"4" }}
 
-If ``value`` is ``['a', 'b', 'c', 'd']`` or ``"abcd"``, the output will be
-``True``.
+If ``value`` is ``['a', 'b', 'c', 'd']``, the output will be ``True``.
 
 .. templatefilter:: linebreaks
 
-``linebreaks``
---------------
+linebreaks
+^^^^^^^^^^
 
 Replaces line breaks in plain text with appropriate HTML; a single
 newline becomes an HTML line break (``<br />``) and a new line
@@ -1890,8 +1716,8 @@ slug</p>``.
 
 .. templatefilter:: linebreaksbr
 
-``linebreaksbr``
-----------------
+linebreaksbr
+^^^^^^^^^^^^
 
 Converts all newlines in a piece of plain text to HTML line breaks
 (``<br />``).
@@ -1905,8 +1731,8 @@ slug``.
 
 .. templatefilter:: linenumbers
 
-``linenumbers``
----------------
+linenumbers
+^^^^^^^^^^^
 
 Displays text with line numbers.
 
@@ -1928,8 +1754,8 @@ the output will be::
 
 .. templatefilter:: ljust
 
-``ljust``
----------
+ljust
+^^^^^
 
 Left-aligns the value in a field of a given width.
 
@@ -1943,8 +1769,8 @@ If ``value`` is ``Django``, the output will be ``"Django    "``.
 
 .. templatefilter:: lower
 
-``lower``
----------
+lower
+^^^^^
 
 Converts a string into all lowercase.
 
@@ -1952,13 +1778,13 @@ For example::
 
     {{ value|lower }}
 
-If ``value`` is ``Totally LOVING this Album!``, the output will be
-``totally loving this album!``.
+If ``value`` is ``Still MAD At Yoko``, the output will be
+``still mad at yoko``.
 
 .. templatefilter:: make_list
 
-``make_list``
--------------
+make_list
+^^^^^^^^^
 
 Returns the value turned into a list. For a string, it's a list of characters.
 For an integer, the argument is cast into an unicode string before creating a
@@ -1969,13 +1795,13 @@ For example::
     {{ value|make_list }}
 
 If ``value`` is the string ``"Joel"``, the output would be the list
-``['J', 'o', 'e', 'l']``. If ``value`` is ``123``, the output will be the
-list ``['1', '2', '3']``.
+``[u'J', u'o', u'e', u'l']``. If ``value`` is ``123``, the output will be the
+list ``[u'1', u'2', u'3']``.
 
 .. templatefilter:: phone2numeric
 
-``phone2numeric``
------------------
+phone2numeric
+^^^^^^^^^^^^^
 
 Converts a phone number (possibly containing letters) to its numerical
 equivalent.
@@ -1991,8 +1817,8 @@ If ``value`` is ``800-COLLECT``, the output will be ``800-2655328``.
 
 .. templatefilter:: pluralize
 
-``pluralize``
--------------
+pluralize
+^^^^^^^^^
 
 Returns a plural suffix if the value is not 1. By default, this suffix is
 ``'s'``.
@@ -2022,15 +1848,15 @@ Example::
 
 .. templatefilter:: pprint
 
-``pprint``
-----------
+pprint
+^^^^^^
 
 A wrapper around :func:`pprint.pprint` -- for debugging, really.
 
 .. templatefilter:: random
 
-``random``
-----------
+random
+^^^^^^
 
 Returns a random item from the given list.
 
@@ -2040,10 +1866,41 @@ For example::
 
 If ``value`` is the list ``['a', 'b', 'c', 'd']``, the output could be ``"b"``.
 
+.. templatefilter:: removetags
+
+removetags
+^^^^^^^^^^
+
+Removes a space-separated list of [X]HTML tags from the output.
+
+For example::
+
+    {{ value|removetags:"b span" }}
+
+If ``value`` is ``"<b>Joel</b> <button>is</button> a <span>slug</span>"`` the
+unescaped output will be ``"Joel <button>is</button> a slug"``.
+
+Note that this filter is case-sensitive.
+
+If ``value`` is ``"<B>Joel</B> <button>is</button> a <span>slug</span>"`` the
+unescaped output will be ``"<B>Joel</B> <button>is</button> a slug"``.
+
+.. admonition:: No safety guarantee
+
+    Note that ``removetags`` doesn't give any guarantee about its output being
+    HTML safe. In particular, it doesn't work recursively, so an input like
+    ``"<sc<script>ript>alert('XSS')</sc</script>ript>"`` won't be safe even if
+    you apply ``|removetags:"script"``. So if the input is user provided,
+    **NEVER** apply the ``safe`` filter to a ``removetags`` output. If you are
+    looking for something more robust, you can use the ``bleach`` Python
+    library, notably its `clean`_ method.
+
+.. _clean: http://bleach.readthedocs.org/en/latest/clean.html
+
 .. templatefilter:: rjust
 
-``rjust``
----------
+rjust
+^^^^^
 
 Right-aligns the value in a field of a given width.
 
@@ -2057,8 +1914,8 @@ If ``value`` is ``Django``, the output will be ``"    Django"``.
 
 .. templatefilter:: safe
 
-``safe``
---------
+safe
+^^^^
 
 Marks a string as not requiring further HTML escaping prior to output. When
 autoescaping is off, this filter has no effect.
@@ -2067,18 +1924,20 @@ autoescaping is off, this filter has no effect.
 
     If you are chaining filters, a filter applied after ``safe`` can
     make the contents unsafe again. For example, the following code
-    prints the variable as is, unescaped::
+    prints the variable as is, unescaped:
+
+    .. code-block:: html+django
 
         {{ var|safe|escape }}
 
 .. templatefilter:: safeseq
 
-``safeseq``
------------
+safeseq
+^^^^^^^
 
-Applies the :tfilter:`safe` filter to each element of a sequence. Useful in
+Applies the :tfilter:`safe` filter to each element of a sequence.  Useful in
 conjunction with other filters that operate on sequences, such as
-:tfilter:`join`. For example::
+:tfilter:`join`.  For example::
 
     {{ some_list|safeseq|join:", " }}
 
@@ -2088,13 +1947,13 @@ individual elements of the sequence.
 
 .. templatefilter:: slice
 
-``slice``
----------
+slice
+^^^^^
 
 Returns a slice of the list.
 
 Uses the same syntax as Python's list slicing. See
-http://www.diveintopython3.net/native-datatypes.html#slicinglists
+http://diveintopython.net/native_data_types/lists.html#odbchelper.list.slice
 for an introduction.
 
 Example::
@@ -2105,12 +1964,12 @@ If ``some_list`` is ``['a', 'b', 'c']``, the output will be ``['a', 'b']``.
 
 .. templatefilter:: slugify
 
-``slugify``
------------
+slugify
+^^^^^^^
 
-Converts to ASCII. Converts spaces to hyphens. Removes characters that aren't
-alphanumerics, underscores, or hyphens. Converts to lowercase. Also strips
-leading and trailing whitespace.
+Converts to lowercase, removes non-word characters (alphanumerics and
+underscores) and converts spaces to hyphens. Also strips leading and trailing
+whitespace.
 
 For example::
 
@@ -2120,23 +1979,26 @@ If ``value`` is ``"Joel is a slug"``, the output will be ``"joel-is-a-slug"``.
 
 .. templatefilter:: stringformat
 
-``stringformat``
-----------------
+stringformat
+^^^^^^^^^^^^
 
 Formats the variable according to the argument, a string formatting specifier.
-This specifier uses the :ref:`old-string-formatting` syntax, with the exception
-that the leading "%" is dropped.
+This specifier uses Python string formatting syntax, with the exception that
+the leading "%" is dropped.
+
+See http://docs.python.org/library/stdtypes.html#string-formatting-operations
+for documentation of Python string formatting
 
 For example::
 
-    {{ value|stringformat:"E" }}
+    {{ value|stringformat:"s" }}
 
-If ``value`` is ``10``, the output will be ``1.000000E+01``.
+If ``value`` is ``"Joel is a slug"``, the output will be ``"Joel is a slug"``.
 
 .. templatefilter:: striptags
 
-``striptags``
--------------
+striptags
+^^^^^^^^^
 
 Makes all possible efforts to strip all [X]HTML tags.
 
@@ -2155,18 +2017,22 @@ output will be ``"Joel is a slug"``.
     more robust, you can use the ``bleach`` Python library, notably its
     `clean`_ method.
 
-.. _clean: https://bleach.readthedocs.io/en/latest/clean.html
+.. _clean: http://bleach.readthedocs.org/en/latest/clean.html
 
 .. templatefilter:: time
 
-``time``
---------
+time
+^^^^
 
 Formats a time according to the given format.
 
 Given format can be the predefined one :setting:`TIME_FORMAT`, or a custom
 format, same as the :tfilter:`date` filter. Note that the predefined format
-is locale-dependent.
+is locale-dependant.
+
+The time filter will only accept parameters in the format string that relate
+to the time of day, not the date (for obvious reasons). If you need to
+format a date, use the :tfilter:`date` filter.
 
 For example::
 
@@ -2185,17 +2051,6 @@ for example, ``"de"``, then for::
 the output will be the string ``"01:23:00"`` (The ``"TIME_FORMAT"`` format
 specifier for the ``de`` locale as shipped with Django is ``"H:i:s"``).
 
-The ``time`` filter will only accept parameters in the format string that
-relate to the time of day, not the date (for obvious reasons). If you need to
-format a ``date`` value, use the :tfilter:`date` filter instead (or along
-``time`` if you need to render a full :py:class:`~datetime.datetime` value).
-
-There is one exception the above rule: When passed a ``datetime`` value with
-attached timezone information (a :ref:`time-zone-aware
-<naive_vs_aware_datetimes>` ``datetime`` instance) the ``time`` filter will
-accept the timezone-related :ref:`format specifiers
-<date-and-time-formatting-specifiers>` ``'e'``, ``'O'`` , ``'T'`` and ``'Z'``.
-
 When used without a format string::
 
     {{ value|time }}
@@ -2203,10 +2058,13 @@ When used without a format string::
 ...the formatting string defined in the :setting:`TIME_FORMAT` setting will be
 used, without applying any localization.
 
+.. versionchanged:: 1.2
+    Predefined formats can now be influenced by the current locale.
+
 .. templatefilter:: timesince
 
-``timesince``
--------------
+timesince
+^^^^^^^^^
 
 Formats a date as the time since that date (e.g., "4 days, 6 hours").
 
@@ -2214,9 +2072,7 @@ Takes an optional argument that is a variable containing the date to use as
 the comparison point (without the argument, the comparison point is *now*).
 For example, if ``blog_date`` is a date instance representing midnight on 1
 June 2006, and ``comment_date`` is a date instance for 08:00 on 1 June 2006,
-then the following would return "8 hours"::
-
-    {{ blog_date|timesince:comment_date }}
+then ``{{ blog_date|timesince:comment_date }}`` would return "8 hours".
 
 Comparing offset-naive and offset-aware datetimes will return an empty string.
 
@@ -2225,8 +2081,8 @@ date that is in the future relative to the comparison point.
 
 .. templatefilter:: timeuntil
 
-``timeuntil``
--------------
+timeuntil
+^^^^^^^^^
 
 Similar to ``timesince``, except that it measures the time from now until the
 given date or datetime. For example, if today is 1 June 2006 and
@@ -2235,9 +2091,7 @@ given date or datetime. For example, if today is 1 June 2006 and
 
 Takes an optional argument that is a variable containing the date to use as
 the comparison point (instead of *now*). If ``from_date`` contains 22 June
-2006, then the following will return "1 week"::
-
-    {{ conference_date|timeuntil:from_date }}
+2006, then ``{{ conference_date|timeuntil:from_date }}`` will return "1 week".
 
 Comparing offset-naive and offset-aware datetimes will return an empty string.
 
@@ -2246,23 +2100,23 @@ date that is in the past relative to the comparison point.
 
 .. templatefilter:: title
 
-``title``
----------
+title
+^^^^^
 
-Converts a string into titlecase by making words start with an uppercase
-character and the remaining characters lowercase. This tag makes no effort to
-keep "trivial words" in lowercase.
+Converts a string into titlecase.
 
 For example::
 
     {{ value|title }}
 
-If ``value`` is ``"my FIRST post"``, the output will be ``"My First Post"``.
+If ``value`` is ``"my first post"``, the output will be ``"My First Post"``.
 
 .. templatefilter:: truncatechars
 
-``truncatechars``
------------------
+truncatechars
+^^^^^^^^^^^^^
+
+.. versionadded:: 1.4
 
 Truncates a string if it is longer than the specified number of characters.
 Truncated strings will end with a translatable ellipsis sequence ("...").
@@ -2275,28 +2129,10 @@ For example::
 
 If ``value`` is ``"Joel is a slug"``, the output will be ``"Joel i..."``.
 
-.. templatefilter:: truncatechars_html
-
-``truncatechars_html``
-----------------------
-
-Similar to :tfilter:`truncatechars`, except that it is aware of HTML tags. Any
-tags that are opened in the string and not closed before the truncation point
-are closed immediately after the truncation.
-
-For example::
-
-    {{ value|truncatechars_html:9 }}
-
-If ``value`` is ``"<p>Joel is a slug</p>"``, the output will be
-``"<p>Joel i...</p>"``.
-
-Newlines in the HTML content will be preserved.
-
 .. templatefilter:: truncatewords
 
-``truncatewords``
------------------
+truncatewords
+^^^^^^^^^^^^^
 
 Truncates a string after a certain number of words.
 
@@ -2312,8 +2148,8 @@ Newlines within the string will be removed.
 
 .. templatefilter:: truncatewords_html
 
-``truncatewords_html``
-----------------------
+truncatewords_html
+^^^^^^^^^^^^^^^^^^
 
 Similar to :tfilter:`truncatewords`, except that it is aware of HTML tags. Any
 tags that are opened in the string and not closed before the truncation point,
@@ -2333,8 +2169,8 @@ Newlines in the HTML content will be preserved.
 
 .. templatefilter:: unordered_list
 
-``unordered_list``
-------------------
+unordered_list
+^^^^^^^^^^^^^^
 
 Recursively takes a self-nested list and returns an HTML unordered list --
 WITHOUT opening and closing <ul> tags.
@@ -2355,10 +2191,13 @@ contains ``['States', ['Kansas', ['Lawrence', 'Topeka'], 'Illinois']]``, then
     </ul>
     </li>
 
+Note: An older, more restrictive and verbose input format is also supported:
+``['States', [['Kansas', [['Lawrence', []], ['Topeka', []]]], ['Illinois', []]]]``,
+
 .. templatefilter:: upper
 
-``upper``
----------
+upper
+^^^^^
 
 Converts a string into all uppercase.
 
@@ -2370,8 +2209,8 @@ If ``value`` is ``"Joel is a slug"``, the output will be ``"JOEL IS A SLUG"``.
 
 .. templatefilter:: urlencode
 
-``urlencode``
--------------
+urlencode
+^^^^^^^^^
 
 Escapes a value for use in a URL.
 
@@ -2379,8 +2218,10 @@ For example::
 
     {{ value|urlencode }}
 
-If ``value`` is ``"https://www.example.org/foo?a=b&c=d"``, the output will be
-``"https%3A//www.example.org/foo%3Fa%3Db%26c%3Dd"``.
+If ``value`` is ``"http://www.example.org/foo?a=b&c=d"``, the output will be
+``"http%3A//www.example.org/foo%3Fa%3Db%26c%3Dd"``.
+
+.. versionadded:: 1.3
 
 An optional argument containing the characters which should not be escaped can
 be provided.
@@ -2390,23 +2231,28 @@ provided when *all* characters should be escaped. For example::
 
     {{ value|urlencode:"" }}
 
-If ``value`` is ``"https://www.example.org/"``, the output will be
-``"https%3A%2F%2Fwww.example.org%2F"``.
+If ``value`` is ``"http://www.example.org/"``, the output will be
+``"http%3A%2F%2Fwww.example.org%2F"``.
 
 .. templatefilter:: urlize
 
-``urlize``
-----------
+urlize
+^^^^^^
 
-Converts URLs and email addresses in text into clickable links.
+Converts URLs in text into clickable links.
 
 This template tag works on links prefixed with ``http://``, ``https://``, or
-``www.``. For example, ``https://goo.gl/aia1t`` will get converted but
+``www.``. For example, ``http://goo.gl/aia1t`` will get converted but
 ``goo.gl/aia1t`` won't.
 
 It also supports domain-only links ending in one of the original top level
 domains (``.com``, ``.edu``, ``.gov``, ``.int``, ``.mil``, ``.net``, and
 ``.org``). For example, ``djangoproject.com`` gets converted.
+
+.. versionchanged:: 1.4
+
+Until Django 1.4, only the ``.com``, ``.net`` and ``.org`` suffixes were
+supported for domain-only links.
 
 Links can have trailing punctuation (periods, commas, close-parens) and leading
 punctuation (opening parens), and ``urlize`` will still do the right thing.
@@ -2422,11 +2268,6 @@ If ``value`` is ``"Check out www.djangoproject.com"``, the output will be
 ``"Check out <a href="http://www.djangoproject.com"
 rel="nofollow">www.djangoproject.com</a>"``.
 
-In addition to web links, ``urlize`` also converts email addresses into
-``mailto:`` links. If ``value`` is
-``"Send questions to foo@example.com"``, the output will be
-``"Send questions to <a href="mailto:foo@example.com">foo@example.com</a>"``.
-
 The ``urlize`` filter also takes an optional parameter ``autoescape``. If
 ``autoescape`` is ``True``, the link text and URLs will be escaped using
 Django's built-in :tfilter:`escape` filter. The default value for
@@ -2439,11 +2280,11 @@ Django's built-in :tfilter:`escape` filter. The default value for
 
 .. templatefilter:: urlizetrunc
 
-``urlizetrunc``
----------------
+urlizetrunc
+^^^^^^^^^^^
 
-Converts URLs and email addresses into clickable links just like urlize_, but
-truncates URLs longer than the given character limit.
+Converts URLs into clickable links just like urlize_, but truncates URLs
+longer than the given character limit.
 
 **Argument:** Number of characters that link text should be truncated to,
 including the ellipsis that's added if truncation is necessary.
@@ -2460,8 +2301,8 @@ As with urlize_, this filter should only be applied to plain text.
 
 .. templatefilter:: wordcount
 
-``wordcount``
--------------
+wordcount
+^^^^^^^^^
 
 Returns the number of words.
 
@@ -2473,8 +2314,8 @@ If ``value`` is ``"Joel is a slug"``, the output will be ``4``.
 
 .. templatefilter:: wordwrap
 
-``wordwrap``
-------------
+wordwrap
+^^^^^^^^
 
 Wraps words at specified line length.
 
@@ -2492,37 +2333,37 @@ If ``value`` is ``Joel is a slug``, the output would be::
 
 .. templatefilter:: yesno
 
-``yesno``
----------
+yesno
+^^^^^
 
-Maps values for ``True``, ``False``, and (optionally) ``None``, to the strings
-"yes", "no", "maybe", or a custom mapping passed as a comma-separated list, and
+Maps values for true, false and (optionally) None, to the strings "yes", "no",
+"maybe", or a custom mapping passed as a comma-separated list, and
 returns one of those strings according to the value:
 
 For example::
 
     {{ value|yesno:"yeah,no,maybe" }}
 
-==========  ======================  ===========================================
+==========  ======================  ==================================
 Value       Argument                Outputs
-==========  ======================  ===========================================
+==========  ======================  ==================================
 ``True``                            ``yes``
 ``True``    ``"yeah,no,maybe"``     ``yeah``
 ``False``   ``"yeah,no,maybe"``     ``no``
 ``None``    ``"yeah,no,maybe"``     ``maybe``
-``None``    ``"yeah,no"``           ``no`` (converts ``None`` to ``False``
-                                    if no mapping for ``None`` is given)
-==========  ======================  ===========================================
+``None``    ``"yeah,no"``           ``"no"`` (converts None to False
+                                    if no mapping for None is given)
+==========  ======================  ==================================
 
 Internationalization tags and filters
-=====================================
+-------------------------------------
 
 Django provides template tags and filters to control each aspect of
 :doc:`internationalization </topics/i18n/index>` in templates. They allow for
 granular control of translations, formatting, and time zone conversions.
 
-``i18n``
---------
+i18n
+^^^^
 
 This library allows specifying translatable text in templates.
 To enable it, set :setting:`USE_I18N` to ``True``, then load it with
@@ -2530,8 +2371,8 @@ To enable it, set :setting:`USE_I18N` to ``True``, then load it with
 
 See :ref:`specifying-translation-strings-in-template-code`.
 
-``l10n``
---------
+l10n
+^^^^
 
 This library provides control over the localization of values in templates.
 You only need to load the library using ``{% load l10n %}``, but you'll often
@@ -2539,8 +2380,10 @@ set :setting:`USE_L10N` to ``True`` so that localization is active by default.
 
 See :ref:`topic-l10n-templates`.
 
-``tz``
-------
+tz
+^^
+
+.. versionadded:: 1.4
 
 This library provides control over time zone conversions in templates.
 Like ``l10n``, you only need to load the library using ``{% load tz %}``,
@@ -2550,69 +2393,87 @@ to local time happens by default.
 See :ref:`time-zones-in-templates`.
 
 Other tags and filters libraries
-================================
+--------------------------------
 
 Django comes with a couple of other template-tag libraries that you have to
 enable explicitly in your :setting:`INSTALLED_APPS` setting and enable in your
 template with the :ttag:`{% load %}<load>` tag.
 
-``django.contrib.humanize``
----------------------------
+django.contrib.humanize
+^^^^^^^^^^^^^^^^^^^^^^^
 
 A set of Django template filters useful for adding a "human touch" to data. See
 :doc:`/ref/contrib/humanize`.
 
-``static``
-----------
+django.contrib.markup
+^^^^^^^^^^^^^^^^^^^^^
+
+A collection of template filters that implement these common markup languages:
+
+* Textile
+* Markdown
+* reST (reStructuredText)
+
+See the :doc:`markup documentation </ref/contrib/markup>`.
+
+django.contrib.webdesign
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+A collection of template tags that can be useful while designing a Web site,
+such as a generator of Lorem Ipsum text. See :doc:`/ref/contrib/webdesign`.
+
+static
+^^^^^^
 
 .. templatetag:: static
 
-``static``
-~~~~~~~~~~
+static
+""""""
+
+.. highlight:: html+django
 
 To link to static files that are saved in :setting:`STATIC_ROOT` Django ships
-with a :ttag:`static` template tag. If the :mod:`django.contrib.staticfiles`
-app is installed, the tag will serve files using ``url()`` method of the
-storage specified by :setting:`STATICFILES_STORAGE`. For example::
+with a :ttag:`static` template tag. You can use this regardless if you're
+using :class:`~django.template.RequestContext` or not.
+
+.. code-block:: html+django
 
     {% load static %}
-    <img src="{% static "images/hi.jpg" %}" alt="Hi!" />
+    <img src="{% static "images/hi.jpg" %}" />
 
 It is also able to consume standard context variables, e.g. assuming a
-``user_stylesheet`` variable is passed to the template::
+``user_stylesheet`` variable is passed to the template:
+
+.. code-block:: html+django
 
     {% load static %}
     <link rel="stylesheet" href="{% static user_stylesheet %}" type="text/css" media="screen" />
 
-If you'd like to retrieve a static URL without displaying it, you can use a
-slightly different call::
+.. note::
 
-    {% load static %}
-    {% static "images/hi.jpg" as myphoto %}
-    <img src="{{ myphoto }}"></img>
+    The :mod:`staticfiles<django.contrib.staticfiles>` contrib app also ships
+    with a :ttag:`static template tag<staticfiles-static>` which uses
+    ``staticfiles'`` :setting:`STATICFILES_STORAGE` to build the URL of the
+    given path. Use that instead if you have an advanced use case such as
+    :ref:`using a cloud service to serve static files<staticfiles-from-cdn>`::
 
-.. admonition:: Using Jinja2 templates?
-
-    See :class:`~django.template.backends.jinja2.Jinja2` for information on
-    using the ``static`` tag with Jinja2.
-
-.. versionchanged:: 1.10
-
-    In older versions, you had to use ``{% load static from staticfiles %}`` in
-    your template to serve files from the storage defined in
-    :setting:`STATICFILES_STORAGE`. This is no longer required.
+        {% load static from staticfiles %}
+        <img src="{% static "images/hi.jpg" %}" />
 
 .. templatetag:: get_static_prefix
 
-``get_static_prefix``
-~~~~~~~~~~~~~~~~~~~~~
+get_static_prefix
+"""""""""""""""""
 
-You should prefer the :ttag:`static` template tag, but if you need more control
-over exactly where and how :setting:`STATIC_URL` is injected into the template,
-you can use the :ttag:`get_static_prefix` template tag::
+.. highlight:: html+django
+
+If you're not using :class:`~django.template.RequestContext`, or if you need
+more control over exactly where and how :setting:`STATIC_URL` is injected
+into the template, you can use the :ttag:`get_static_prefix` template tag
+instead::
 
     {% load static %}
-    <img src="{% get_static_prefix %}images/hi.jpg" alt="Hi!" />
+    <img src="{% get_static_prefix %}images/hi.jpg" />
 
 There's also a second form you can use to avoid extra processing if you need
 the value multiple times::
@@ -2620,19 +2481,19 @@ the value multiple times::
     {% load static %}
     {% get_static_prefix as STATIC_PREFIX %}
 
-    <img src="{{ STATIC_PREFIX }}images/hi.jpg" alt="Hi!" />
-    <img src="{{ STATIC_PREFIX }}images/hi2.jpg" alt="Hello!" />
+    <img src="{{ STATIC_PREFIX }}images/hi.jpg" />
+    <img src="{{ STATIC_PREFIX }}images/hi2.jpg" />
 
 .. templatetag:: get_media_prefix
 
-``get_media_prefix``
-~~~~~~~~~~~~~~~~~~~~
+get_media_prefix
+""""""""""""""""
+
+.. highlight:: html+django
 
 Similar to the :ttag:`get_static_prefix`, ``get_media_prefix`` populates a
 template variable with the media prefix :setting:`MEDIA_URL`, e.g.::
 
-    {% load static %}
-    <body data-media-url="{% get_media_prefix %}">
-
-By storing the value in a data attribute, we ensure it's escaped appropriately
-if we want to use it in a JavaScript context.
+    <script type="text/javascript" charset="utf-8">
+    var media_path = '{% get_media_prefix %}';
+    </script>

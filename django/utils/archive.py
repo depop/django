@@ -1,7 +1,7 @@
 """
 Based on "python-archive" -- http://pypi.python.org/pypi/python-archive/
 
-Copyright (c) 2010 Gary Wilson Jr. <gary.wilson@gmail.com> and contributors.
+Copyright (c) 2010 Gary Wilson Jr. <gary.wilson@gmail.com> and contributers.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -21,12 +21,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 """
+from __future__ import with_statement
 import os
 import shutil
+import sys
 import tarfile
 import zipfile
-
-from django.utils import six
 
 
 class ArchiveException(Exception):
@@ -46,8 +46,7 @@ def extract(path, to_path=''):
     Unpack the tar or zip file at the specified path to the directory
     specified by to_path.
     """
-    with Archive(path) as archive:
-        archive.extract(to_path)
+    Archive(path).extract(to_path)
 
 
 class Archive(object):
@@ -60,7 +59,7 @@ class Archive(object):
     @staticmethod
     def _archive_cls(file):
         cls = None
-        if isinstance(file, six.string_types):
+        if isinstance(file, basestring):
             filename = file
         else:
             try:
@@ -78,20 +77,11 @@ class Archive(object):
                 "Path not a recognized archive format: %s" % filename)
         return cls
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
-
     def extract(self, to_path=''):
         self._archive.extract(to_path)
 
     def list(self):
         self._archive.list()
-
-    def close(self):
-        self._archive.close()
 
 
 class BaseArchive(object):
@@ -101,7 +91,8 @@ class BaseArchive(object):
     def split_leading_dir(self, path):
         path = str(path)
         path = path.lstrip('/').lstrip('\\')
-        if '/' in path and (('\\' in path and path.find('/') < path.find('\\')) or '\\' not in path):
+        if '/' in path and (('\\' in path and path.find('/') < path.find('\\'))
+                            or '\\' not in path):
             return path.split('/', 1)
         elif '\\' in path:
             return path.split('\\', 1)
@@ -125,10 +116,10 @@ class BaseArchive(object):
         return True
 
     def extract(self):
-        raise NotImplementedError('subclasses of BaseArchive must provide an extract() method')
+        raise NotImplementedError
 
     def list(self):
-        raise NotImplementedError('subclasses of BaseArchive must provide a list() method')
+        raise NotImplementedError
 
 
 class TarArchive(BaseArchive):
@@ -140,8 +131,10 @@ class TarArchive(BaseArchive):
         self._archive.list(*args, **kwargs)
 
     def extract(self, to_path):
-        members = self._archive.getmembers()
-        leading = self.has_leading_dir(x.name for x in members)
+        # note: python<=2.5 doesnt seem to know about pax headers, filter them
+        members = [member for member in self._archive.getmembers()
+                   if member.name != 'pax_global_header']
+        leading = self.has_leading_dir(members)
         for member in members:
             name = member.name
             if leading:
@@ -153,11 +146,11 @@ class TarArchive(BaseArchive):
             else:
                 try:
                     extracted = self._archive.extractfile(member)
-                except (KeyError, AttributeError) as exc:
+                except (KeyError, AttributeError):
                     # Some corrupt tar files seem to produce this
                     # (specifically bad symlinks)
-                    print("In the tar file %s the member %s is invalid: %s" %
-                          (name, member.name, exc))
+                    print ("In the tar file %s the member %s is invalid: %s" %
+                           (name, member.name, sys.exc_info()[1]))
                 else:
                     dirname = os.path.dirname(filename)
                     if dirname and not os.path.exists(dirname):
@@ -167,9 +160,6 @@ class TarArchive(BaseArchive):
                 finally:
                     if extracted:
                         extracted.close()
-
-    def close(self):
-        self._archive.close()
 
 
 class ZipArchive(BaseArchive):
@@ -198,9 +188,6 @@ class ZipArchive(BaseArchive):
             else:
                 with open(filename, 'wb') as outfile:
                     outfile.write(data)
-
-    def close(self):
-        self._archive.close()
 
 extension_map = {
     '.tar': TarArchive,

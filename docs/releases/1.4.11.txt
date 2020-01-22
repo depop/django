@@ -16,12 +16,14 @@ Django's URL handling is based on a mapping of regex patterns
 consists of matching a requested URL against those patterns to
 determine the appropriate view to invoke.
 
-Django also provides a convenience function -- ``reverse()`` -- which performs
-this process in the opposite direction. The ``reverse()`` function takes
-information about a view and returns a URL which would invoke that view. Use
-of ``reverse()`` is encouraged for application developers, as the output of
-``reverse()`` is always based on the current URL patterns, meaning developers
-do not need to change other code when making changes to URLs.
+Django also provides a convenience function --
+:func:`~django.core.urlresolvers.reverse` -- which performs this process
+in the opposite direction. The ``reverse()`` function takes
+information about a view and returns a URL which would invoke that
+view. Use of ``reverse()`` is encouraged for application developers,
+as the output of ``reverse()`` is always based on the current URL
+patterns, meaning developers do not need to change other code when
+making changes to URLs.
 
 One argument signature for ``reverse()`` is to pass a dotted Python
 path to the desired view. In this situation, Django will import the
@@ -50,7 +52,7 @@ Caching of anonymous pages could reveal CSRF token
 
 Django includes both a :doc:`caching framework </topics/cache>` and a system
 for :doc:`preventing cross-site request forgery (CSRF) attacks
-</ref/csrf/>`. The CSRF-protection system is based on a random nonce
+</ref/contrib/csrf/>`. The CSRF-protection system is based on a random nonce
 sent to the client in a cookie which must be sent by the client on future
 requests and, in forms, a hidden value which must be submitted back with the
 form.
@@ -94,7 +96,7 @@ field classes did not correctly convert their arguments:
 
 * :class:`~django.db.models.FilePathField`
 * :class:`~django.db.models.GenericIPAddressField`
-* ``IPAddressField``
+* :class:`~django.db.models.IPAddressField`
 
 These three fields have been updated to convert their arguments to the
 correct types before querying.

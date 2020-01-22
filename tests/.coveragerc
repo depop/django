@@ -1,14 +1,5 @@
 [run]
-branch = True
-omit =
-    */django/utils/autoreload.py
-source = django
-
-[report]
-ignore_errors = True
-omit =
-    */django/conf/locale/*
-    */tests/*
+omit = runtests,test_sqlite,regressiontests*,modeltests*,*/django/contrib/*/tests*,*/django/utils/unittest*,*/django/utils/simplejson*,*/django/utils/importlib.py,*/django/test/_doctest.py,*/django/core/servers/fastcgi.py,*/django/utils/autoreload.py,*/django/utils/dictconfig.py
 
 [html]
 directory = coverage_html

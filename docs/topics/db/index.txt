@@ -1,4 +1,3 @@
-====================
 Models and databases
 ====================
 
@@ -14,7 +13,6 @@ model maps to a single database table.
    models
    queries
    aggregation
-   search
    managers
    sql
    transactions

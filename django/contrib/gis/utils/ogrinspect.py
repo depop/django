@@ -2,15 +2,13 @@
 This module is for inspecting OGR data sources and generating either
 models for GeoDjango and/or mapping dictionaries for use with the
 `LayerMapping` utility.
-"""
-from django.contrib.gis.gdal import DataSource
-from django.contrib.gis.gdal.field import (
-    OFTDate, OFTDateTime, OFTInteger, OFTInteger64, OFTReal, OFTString,
-    OFTTime,
-)
-from django.utils import six
-from django.utils.six.moves import zip
 
+Author: Travis Pinney, Dane Springmeyer, & Justin Bronn
+"""
+from itertools import izip
+# Requires GDAL to use.
+from django.contrib.gis.gdal import DataSource
+from django.contrib.gis.gdal.field import OFTDate, OFTDateTime, OFTInteger, OFTReal, OFTString, OFTTime
 
 def mapping(data_source, geom_name='geom', layer_key=0, multi_geom=False):
     """
@@ -26,7 +24,7 @@ def mapping(data_source, geom_name='geom', layer_key=0, multi_geom=False):
 
      `multi_geom` => Boolean (default: False) - specify as multigeometry.
     """
-    if isinstance(data_source, six.string_types):
+    if isinstance(data_source, basestring):
         # Instantiating the DataSource from the string.
         data_source = DataSource(data_source)
     elif isinstance(data_source, DataSource):
@@ -40,15 +38,13 @@ def mapping(data_source, geom_name='geom', layer_key=0, multi_geom=False):
     # Generating the field name for each field in the layer.
     for field in data_source[layer_key].fields:
         mfield = field.lower()
-        if mfield[-1:] == '_':
-            mfield += 'field'
+        if mfield[-1:] == '_': mfield += 'field'
         _mapping[mfield] = field
     gtype = data_source[layer_key].geom_type
-    if multi_geom:
-        gtype.to_multi()
-    _mapping[geom_name] = str(gtype).upper()
+    if multi_geom and gtype.num in (1, 2, 3): prefix = 'MULTI'
+    else: prefix = ''
+    _mapping[geom_name] = prefix + str(gtype).upper()
     return _mapping
-
 
 def ogrinspect(*args, **kwargs):
     """
@@ -72,8 +68,8 @@ def ogrinspect(*args, **kwargs):
     shp_file = 'data/mapping_hacks/world_borders.shp'
     model_name = 'WorldBorders'
 
-    print(ogrinspect(shp_file, model_name, multi_geom=True, srid=4326,
-                     geom_name='shapes', blank=True))
+    print ogrinspect(shp_file, model_name, multi_geom=True, srid=4326,
+                     geom_name='shapes', blank=True)
 
     Required Arguments
      `datasource` => string or DataSource object to file pointer
@@ -94,7 +90,7 @@ def ogrinspect(*args, **kwargs):
      `multi_geom` => Boolean (default: False) - specify as multigeometry.
 
      `name_field` => String - specifies a field name to return for the
-       `__unicode__`/`__str__` function (which will be generated if specified).
+       `__unicode__` function (which will be generated if specified).
 
      `imports` => Boolean (default: True) - set to False to omit the
        `from django.contrib.gis.db import models` code from the
@@ -120,7 +116,6 @@ def ogrinspect(*args, **kwargs):
     """
     return '\n'.join(s for s in _ogrinspect(*args, **kwargs))
 
-
 def _ogrinspect(data_source, model_name, geom_name='geom', layer_key=0, srid=None,
                 multi_geom=False, name_field=None, imports=True,
                 decimal=False, blank=False, null=False):
@@ -129,7 +124,7 @@ def _ogrinspect(data_source, model_name, geom_name='geom', layer_key=0, srid=Non
     to the given data source.  See the `ogrinspect` docstring for more details.
     """
     # Getting the DataSource
-    if isinstance(data_source, six.string_types):
+    if isinstance(data_source, str):
         data_source = DataSource(data_source)
     elif isinstance(data_source, DataSource):
         pass
@@ -157,14 +152,10 @@ def _ogrinspect(data_source, model_name, geom_name='geom', layer_key=0, srid=Non
     # Gets the `null` and `blank` keywords for the given field name.
     def get_kwargs_str(field_name):
         kwlist = []
-        if field_name.lower() in null_fields:
-            kwlist.append('null=True')
-        if field_name.lower() in blank_fields:
-            kwlist.append('blank=True')
-        if kwlist:
-            return ', ' + ', '.join(kwlist)
-        else:
-            return ''
+        if field_name.lower() in null_fields: kwlist.append('null=True')
+        if field_name.lower() in blank_fields: kwlist.append('blank=True')
+        if kwlist: return ', ' + ', '.join(kwlist)
+        else: return ''
 
     # For those wishing to disable the imports.
     if imports:
@@ -174,12 +165,10 @@ def _ogrinspect(data_source, model_name, geom_name='geom', layer_key=0, srid=Non
 
     yield 'class %s(models.Model):' % model_name
 
-    for field_name, width, precision, field_type in zip(
-            ogr_fields, layer.field_widths, layer.field_precisions, layer.field_types):
+    for field_name, width, precision, field_type in izip(ogr_fields, layer.field_widths, layer.field_precisions, layer.field_types):
         # The model field name.
         mfield = field_name.lower()
-        if mfield[-1:] == '_':
-            mfield += 'field'
+        if mfield[-1:] == '_': mfield += 'field'
 
         # Getting the keyword args string.
         kwargs_str = get_kwargs_str(field_name)
@@ -189,15 +178,11 @@ def _ogrinspect(data_source, model_name, geom_name='geom', layer_key=0, srid=Non
             # may also be mapped to `DecimalField` if specified in the
             # `decimal` keyword.
             if field_name.lower() in decimal_fields:
-                yield '    %s = models.DecimalField(max_digits=%d, decimal_places=%d%s)' % (
-                    mfield, width, precision, kwargs_str
-                )
+                yield '    %s = models.DecimalField(max_digits=%d, decimal_places=%d%s)' % (mfield, width, precision, kwargs_str)
             else:
                 yield '    %s = models.FloatField(%s)' % (mfield, kwargs_str[2:])
         elif field_type is OFTInteger:
             yield '    %s = models.IntegerField(%s)' % (mfield, kwargs_str[2:])
-        elif field_type is OFTInteger64:
-            yield '    %s = models.BigIntegerField(%s)' % (mfield, kwargs_str[2:])
         elif field_type is OFTString:
             yield '    %s = models.CharField(max_length=%s%s)' % (mfield, width, kwargs_str)
         elif field_type is OFTDate:
@@ -211,9 +196,10 @@ def _ogrinspect(data_source, model_name, geom_name='geom', layer_key=0, srid=Non
 
     # TODO: Autodetection of multigeometry types (see #7218).
     gtype = layer.geom_type
-    if multi_geom:
-        gtype.to_multi()
-    geom_field = gtype.django
+    if multi_geom and gtype.num in (1, 2, 3):
+        geom_field = 'Multi%s' % gtype.django
+    else:
+        geom_field = gtype.django
 
     # Setting up the SRID keyword string.
     if srid is None:
@@ -232,8 +218,8 @@ def _ogrinspect(data_source, model_name, geom_name='geom', layer_key=0, srid=Non
         srid_str = 'srid=%s' % srid
 
     yield '    %s = models.%s(%s)' % (geom_name, geom_field, srid_str)
+    yield '    objects = models.GeoManager()'
 
     if name_field:
         yield ''
-        yield '    def __%s__(self): return self.%s' % (
-            'str' if six.PY3 else 'unicode', name_field)
+        yield '    def __unicode__(self): return self.%s' % name_field

@@ -1,52 +1,27 @@
-from __future__ import unicode_literals
-
-from django import http
-from django.apps import apps
-from django.conf import settings
 from django.contrib.redirects.models import Redirect
-from django.contrib.sites.shortcuts import get_current_site
-from django.core.exceptions import ImproperlyConfigured
-from django.utils.deprecation import MiddlewareMixin
+from django import http
+from django.conf import settings
 
-
-class RedirectFallbackMiddleware(MiddlewareMixin):
-    # Defined as class-level attributes to be subclassing-friendly.
-    response_gone_class = http.HttpResponseGone
-    response_redirect_class = http.HttpResponsePermanentRedirect
-
-    def __init__(self, get_response=None):
-        if not apps.is_installed('django.contrib.sites'):
-            raise ImproperlyConfigured(
-                "You cannot use RedirectFallbackMiddleware when "
-                "django.contrib.sites is not installed."
-            )
-        super(RedirectFallbackMiddleware, self).__init__(get_response)
-
+class RedirectFallbackMiddleware(object):
     def process_response(self, request, response):
-        # No need to check for a redirect for non-404 responses.
         if response.status_code != 404:
-            return response
-
-        full_path = request.get_full_path()
-        current_site = get_current_site(request)
-
-        r = None
+            return response # No need to check for a redirect for non-404 responses.
+        path = request.get_full_path()
         try:
-            r = Redirect.objects.get(site=current_site, old_path=full_path)
+            r = Redirect.objects.get(site__id__exact=settings.SITE_ID, old_path=path)
         except Redirect.DoesNotExist:
-            pass
-        if r is None and settings.APPEND_SLASH and not request.path.endswith('/'):
+            r = None
+        if r is None and settings.APPEND_SLASH:
+            # Try removing the trailing slash.
             try:
-                r = Redirect.objects.get(
-                    site=current_site,
-                    old_path=request.get_full_path(force_append_slash=True),
-                )
+                r = Redirect.objects.get(site__id__exact=settings.SITE_ID,
+                    old_path=path[:path.rfind('/')]+path[path.rfind('/')+1:])
             except Redirect.DoesNotExist:
                 pass
         if r is not None:
             if r.new_path == '':
-                return self.response_gone_class()
-            return self.response_redirect_class(r.new_path)
+                return http.HttpResponseGone()
+            return http.HttpResponsePermanentRedirect(r.new_path)
 
         # No redirect was found. Return the response.
         return response

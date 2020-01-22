@@ -1,19 +1,13 @@
 from django import template
-from django.templatetags.static import (
-    do_static as _do_static, static as _static,
-)
+from django.contrib.staticfiles.storage import staticfiles_storage
 
 register = template.Library()
 
 
+@register.simple_tag
 def static(path):
-    # Backwards compatibility alias for django.templatetags.static.static().
-    # Deprecation should start in Django 2.0.
-    return _static(path)
-
-
-@register.tag('static')
-def do_static(parser, token):
-    # Backwards compatibility alias for django.templatetags.static.do_static().
-    # Deprecation should start in Django 2.0.
-    return _do_static(parser, token)
+    """
+    A template tag that returns the URL to a file
+    using staticfiles' storage backend
+    """
+    return staticfiles_storage.url(path)

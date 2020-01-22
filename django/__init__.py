@@ -1,27 +1,30 @@
-from __future__ import unicode_literals
+VERSION = (1, 4, 22, 'depop', 5)
 
-from django.utils.version import get_version
+def get_version(version=None):
+    """Derives a PEP386-compliant version number from VERSION."""
+    if version is None:
+        version = VERSION
+    assert len(version) == 5
+    assert version[3] in ('alpha', 'beta', 'rc', 'final', 'depop')
 
-VERSION = (1, 11, 0, 'alpha', 0)
+    # Now build the two parts of the version number:
+    # main = X.Y[.Z]
+    # sub = .devN - for pre-alpha releases
+    #     | {a|b|c}N - for alpha, beta and rc releases
 
-__version__ = get_version(VERSION)
+    parts = 2 if version[2] == 0 else 3
+    main = '.'.join(str(x) for x in version[:parts])
 
+    sub = ''
+    if version[3] == 'alpha' and version[4] == 0:
+        # At the toplevel, this would cause an import loop.
+        from django.utils.version import get_svn_revision
+        svn_revision = get_svn_revision()[4:]
+        if svn_revision != 'unknown':
+            sub = '.dev%s' % svn_revision
 
-def setup(set_prefix=True):
-    """
-    Configure the settings (this happens as a side effect of accessing the
-    first setting), configure logging and populate the app registry.
-    Set the thread-local urlresolvers script prefix if `set_prefix` is True.
-    """
-    from django.apps import apps
-    from django.conf import settings
-    from django.urls import set_script_prefix
-    from django.utils.encoding import force_text
-    from django.utils.log import configure_logging
+    elif version[3] != 'final':
+        mapping = {'alpha': 'a', 'beta': 'b', 'rc': 'c' , 'depop': '.post'}
+        sub = mapping[version[3]] + str(version[4])
 
-    configure_logging(settings.LOGGING_CONFIG, settings.LOGGING)
-    if set_prefix:
-        set_script_prefix(
-            '/' if settings.FORCE_SCRIPT_NAME is None else force_text(settings.FORCE_SCRIPT_NAME)
-        )
-    apps.populate(settings.INSTALLED_APPS)
+    return main + sub

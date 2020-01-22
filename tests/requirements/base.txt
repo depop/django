@@ -1,14 +1,10 @@
-argon2-cffi >= 16.1.0
-bcrypt
 docutils
-geoip2
-jinja2 >= 2.7
-numpy
-Pillow
+Markdown
+numpy < 1.9
+PIL
+py-bcrypt
+python-memcached
+pytz
 PyYAML
-# pylibmc/libmemcached can't be built on Windows.
-pylibmc; sys.platform != 'win32'
-pytz > dev
 selenium
-sqlparse
-tblib
+Textile
